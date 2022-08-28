@@ -1,5 +1,20 @@
 # .NET Core Assembly Unloading
 
+```text
+>>>> Chart for Sin(d/3)
+  1.00 ┤   ╭──╮               ╭─╮                ╭─╮               ╭──╮               ╭──╮               ╭─
+  0.80 ┤  ╭╯  ╰╮             ╭╯ ╰╮              ╭╯ ╰╮             ╭╯  ╰╮             ╭╯  ╰╮             ╭╯
+  0.60 ┤ ╭╯    │            ╭╯   ╰╮            ╭╯   ╰╮            │    ╰╮           ╭╯    ╰╮           ╭╯
+  0.40 ┤╭╯     ╰╮          ╭╯     ╰╮          ╭╯     ╰╮          ╭╯     ╰╮          │      │           │
+  0.20 ┤│       ╰╮         │       │         ╭╯       │         ╭╯       │         ╭╯      ╰╮         ╭╯
+ -0.00 ┼╯        │        ╭╯       ╰╮        │        ╰╮        │        ╰╮        │        ╰╮       ╭╯
+ -0.20 ┤         ╰╮      ╭╯         ╰╮      ╭╯         ╰╮      ╭╯         │       ╭╯         │       │
+ -0.40 ┤          │      │           │      │           │     ╭╯          ╰╮     ╭╯          ╰╮     ╭╯
+ -0.60 ┤          ╰╮    ╭╯           ╰╮    ╭╯           ╰╮    │            ╰╮    │            ╰╮   ╭╯
+ -0.80 ┤           ╰╮  ╭╯             ╰╮  ╭╯             ╰╮  ╭╯             ╰╮  ╭╯             ╰╮ ╭╯
+ -1.00 ┤
+```
+
 ## Links
 
 - [MS Doc: AssemblyLoadContext Class](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext)

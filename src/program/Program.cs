@@ -4,6 +4,7 @@ using System.Runtime.Loader;
 using static System.Console;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using System.Text;
 
 List<Assembly> assemblies = new();
 List<PortableExecutableReference> _references = new();
@@ -24,12 +25,14 @@ var code = @"
 using System;
 namespace {0};
 using static System.Console;
+using static Math;
 
 public class {0} : ITest
 {{
+    public string Name => ""{2}"";
     public int AddTo(int i) => i + {1};
 
-    public string Message(string message) => $""@@@@ {0} '{message}"";
+    public string Message(string message) => $""@@@@ {0} '{{message}}"";
 
     public double Value(double d) => {2};
 
@@ -39,6 +42,8 @@ public class {0} : ITest
 }}
 ";
 
+
+Console.OutputEncoding = Encoding.UTF8; // for ascii chart
 
 var path = Assembly.GetExecutingAssembly().Location;
 while (true)
@@ -66,7 +71,14 @@ while (true)
         case 'd':
             WriteLine ($"There are {AssemblyLoadContext.All.Count()} contexts");
             foreach(var alc in AssemblyLoadContext.All) {
-                WriteLine ($"   {alc.Name}");
+                var assys = alc.Assemblies;
+                WriteLine ($"   {alc.Name} with {assys.Count()} assemblies");
+                if (alc.Name != "Default") {
+                    foreach( var a in assys) {
+                        WriteLine( $"        {a.GetName()}");
+                    }
+                }
+
             }
             break;
         case 'u':
@@ -101,6 +113,34 @@ while (true)
                 }
             }
             break;
+        case 'r':
+            WriteLine("Enter equation using 'd'");
+            var s = ReadLine();
+            if (!string.IsNullOrEmpty(s)) {
+
+                var name = $"Test{loadCount++}";
+                var (p, d) = BuildAssembly(string.Format(code, name, 10, s ), name);
+                if (p is not null && d is not null)
+                {
+                    if (loadAssembly(name, p, d)) {
+                        var t = tests.Last();
+                        WriteLine($">>>> Chart for {t.Name}");
+                        var values = Enumerable.Range(0,100).Select(o => t.Value(o));
+                        WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options{Height = 10}));
+                    }
+                    p.Dispose();
+                    d.Dispose();
+                }
+            }
+            break;
+        case 'p':
+            foreach (var t in tests)
+            {
+                WriteLine($">>>> Chart for {t.Name}");
+                var values = Enumerable.Range(0,50).Select(o => t.Value(o));
+                WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options{Height = 10}));
+            }
+            break;
         case 'g':
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -115,7 +155,7 @@ void unloading(System.Runtime.Loader.AssemblyLoadContext context)
     WriteLine($"Context {context.Name} unloading!");
 }
 
-void loadAssembly(string fname, Stream? s = null, Stream? pdbStream = null)
+bool loadAssembly(string fname, Stream? s = null, Stream? pdbStream = null)
 {
     if (newContext is null)
     {
@@ -152,9 +192,10 @@ void loadAssembly(string fname, Stream? s = null, Stream? pdbStream = null)
         if (context is not null)
         {
             Console.WriteLine($"Loaded into context '{context.Name}'");
+            return true;
         }
     }
-
+    return false;
 }
 
 bool CheckForErrors(List<Diagnostic> diag)
