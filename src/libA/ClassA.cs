@@ -25,6 +25,9 @@ public class ClassA : ITest
         }
         return $">>>> TestA '{message}'";
     }
+
+    public double Value(double d) => d + 10;
+
     ~ClassA () {
         WriteLine("AAAAAAAAAAAAAAAAAAAAAAAAAA!");
     }

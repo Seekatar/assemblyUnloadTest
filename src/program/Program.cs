@@ -29,7 +29,9 @@ public class {0} : ITest
 {{
     public int AddTo(int i) => i + {1};
 
-    public string Message(string message) {{ throw new Exception(""ow!""); }}
+    public string Message(string message) => $""@@@@ {0} '{message}"";
+
+    public double Value(double d) => {2};
 
     ~{0} () {{
         WriteLine(""^^^^ {0} destroyed!"");
@@ -77,7 +79,7 @@ while (true)
             for (int i = 0; i < 1; i++)
             {
                 var name = $"Test{i}";
-                var (p, d) = BuildAssembly(string.Format(code, name, 10), name);
+                var (p, d) = BuildAssembly(string.Format(code, name, 10, "d + 10" ), name);
                 if (p is not null && d is not null)
                 {
                     loadAssembly(name, p, d);
@@ -90,7 +92,7 @@ while (true)
             for (int i = 0; i < 1000; i++)
             {
                 var name = $"Test{i}";
-                var (p, d) = BuildAssembly(string.Format(code, name, 10), name);
+                var (p, d) = BuildAssembly(string.Format(code, name, 11, "d + 11"), name);
                 if (p is not null && d is not null)
                 {
                     loadAssembly(name, p);
