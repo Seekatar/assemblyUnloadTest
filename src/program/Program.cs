@@ -13,7 +13,7 @@ var logger = sp.GetLogger<ITest>();
 
 Console.OutputEncoding = Encoding.UTF8; // for ascii chart
 
-List<ITest> tests = new();
+List<WeakReference<ITest>> tests = new();
 var cmd = ' ';
 
 var myContext = AssemblyLoadContext.GetLoadContext(Assembly.GetExecutingAssembly());
@@ -59,20 +59,23 @@ while (true)
             {
                 var t = manager!.GetImplementationsOf<ITest>(manager!.LoadAssembly(path.Replace("program", "libA")));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case 'b':
             {
                 var t = manager!.GetImplementationsOf<ITest>(manager!.LoadAssembly(path.Replace("program", "libB")));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select( o => new WeakReference<ITest>(o)));
             }
             break;
         case 'c':
             foreach (var i in tests)
             {
-                WriteLine(i.Message(DateTime.Now.ToString()));
+                if (i.TryGetTarget(out var t))
+                    WriteLine(t.Message(DateTime.Now.ToString()));
+                else
+                    logger.LogWarning("Weak reference gone");
             }
             break;
         case 'd':
@@ -92,7 +95,7 @@ while (true)
             break;
         case 'u':
             manager?.Unload();
-            tests.Clear();
+            //tests.Clear();
             break;
         case '1':
             for (int i = 0; i < 1; i++)
@@ -100,16 +103,25 @@ while (true)
                 var name = $"Test{i}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 10, "d + 1"));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case '2':
+            for (int i = 0; i < 100; i++)
+            {
+                var name = $"Test{i}";
+                var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
+                if (t != null)
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
+            }
+            break;
+        case '3':
             for (int i = 0; i < 1000; i++)
             {
                 var name = $"Test{i}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case 'r':
@@ -120,15 +132,18 @@ while (true)
                 var name = $"Test{loadCount++}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 1000, s));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case 'p':
-            foreach (var t in tests)
+            foreach (var i in tests)
             {
-                WriteLine($">>>> Chart for {t.Name}");
-                var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
-                WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
+                if (i.TryGetTarget(out var t))
+                {
+                    WriteLine($">>>> Chart for {t.Name}");
+                    var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
+                    WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
+                }
             }
             break;
         case 'g':

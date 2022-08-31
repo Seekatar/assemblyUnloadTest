@@ -50,8 +50,15 @@ public class AssemblyManager
     public IEnumerable<T>? BuildAndGet<T>(string name, string code) where T : class
     {
         var (p, pdb) = BuildAssembly(name, code);
-        var assembly = LoadAssembly(name, p, pdb);
-        return GetImplementationsOf<T>(assembly);
+        if (p != null)
+        {
+            var assembly = LoadAssembly(name, p);
+
+            // var assembly = LoadAssembly(name, p, pdb); // pdb doesn't help much w/o a source file
+
+            return GetImplementationsOf<T>(assembly);
+        }
+        return null;
     }
 
     public Assembly? LoadAssembly(string name, Stream? s = null, Stream? pdbStream = null)
@@ -75,18 +82,26 @@ public class AssemblyManager
             s = fs;
         }
 
-        var assembly = _newContext?.LoadFromStream(s, pdbStream);
-        fs?.Close();
-        fs?.Dispose();
-
-        if (assembly is not null)
+        try
         {
-            _assemblies.Add(assembly);
+            var assembly = _newContext?.LoadFromStream(s, pdbStream);
 
+            if (assembly is not null)
+            {
+                _assemblies.Add(assembly);
 
-            // this will be our context AssemblyLoadContext.GetLoadContext(assembly);
+                // it will be our context, this would show that
+                // AssemblyLoadContext.GetLoadContext(assembly);
+
+                return assembly;
+            }
         }
-        return assembly;
+        finally
+        {
+            fs?.Close();
+            fs?.Dispose();
+        }
+        return null;
     }
 
     public IEnumerable<T>? GetImplementationsOf<T>(Assembly? assembly) where T : class
@@ -98,7 +113,7 @@ public class AssemblyManager
         return types.Select(o => Activator.CreateInstance(o) as T ?? throw new Exception("ow!"));
     }
 
-    private bool CheckForErrors(List<Diagnostic> diag)
+    private bool CheckForErrors(List<Diagnostic> diag, string? code = null)
     {
         if (!diag.Any(o => o.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)) return true;
 
@@ -106,6 +121,16 @@ public class AssemblyManager
         foreach (var e in diag.Where(o => o.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning))
         {
             _logger.LogInformation($"   {e.ToString()}");
+            if (code != null) {
+                var index = e.Location.SourceSpan.Start;
+                var end = code.IndexOf(Environment.NewLine, index);
+                var begin = code.LastIndexOf(Environment.NewLine, index);
+
+                begin = begin < 0 ? 0 : begin + Environment.NewLine.Length;
+                end = end < 0 ? code.Length : end;
+
+                _logger.LogInformation(code[begin..end]);
+            }
         }
         return false;
     }
@@ -127,13 +152,13 @@ public class AssemblyManager
             {
 
                 compilation = CSharpCompilation
-                    .Create(name)
-                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                    .Create($"{name}-{_loadCount}A")
+                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, moduleName: $"{name}-{_loadCount}"))
                     .AddSyntaxTrees(tree)
                     .AddReferences(_references);
 
                 var diag = compilation.GetDiagnostics();
-                if (!CheckForErrors(diag.ToList())) return (null, null);
+                if (!CheckForErrors(diag.ToList(), code)) return (null, null);
             }
 
             using (Operation.Time("Emitting"))
