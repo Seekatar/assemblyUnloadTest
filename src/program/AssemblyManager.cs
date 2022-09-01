@@ -1,6 +1,7 @@
 
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -29,7 +30,7 @@ public class AssemblyManager
     }
 
     private readonly ILogger<AssemblyManager> _logger;
-    private AssemblyLoadContext? _newContext = null;
+    private WeakReference _newContext = new (new CollectableAssemblyLoadContext());
 
     private List<Assembly> _assemblies = new();
     private List<PortableExecutableReference> _references = new();
@@ -61,17 +62,20 @@ public class AssemblyManager
         return null;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public Assembly? LoadAssembly(string name, Stream? s = null, Stream? pdbStream = null)
     {
-        if (_newContext is null)
+        AssemblyLoadContext? context = _newContext.Target as AssemblyLoadContext;
+        if (context == null)
         {
-            _newContext = new AssemblyLoadContext($"NewContext{_loadCount++}", isCollectible: true);
-            _newContext.Unloading += unloading;
+            context = new AssemblyLoadContext($"NewContext{_loadCount++}", isCollectible: true);
+            // context.Unloading += unloading;
+            _newContext = new WeakReference(context);
             _logger.LogInformation("Created new context");
         }
 
         _logger.LogInformation($"Loading {name} into context.");
-        _logger.LogInformation($"Context currently has {_newContext.Assemblies.Count()} assemblies");
+        _logger.LogInformation($"Context currently has {context.Assemblies.Count()} assemblies");
 
         // var assembly = Assembly.LoadFrom(fname); load into default context
         // var assembly = newContext?.LoadFromAssemblyPath(fname); // locks assembly, even unload doesn't unlock it
@@ -84,7 +88,7 @@ public class AssemblyManager
 
         try
         {
-            var assembly = _newContext?.LoadFromStream(s, pdbStream);
+            var assembly = context?.LoadFromStream(s, pdbStream);
 
             if (assembly is not null)
             {
@@ -104,6 +108,51 @@ public class AssemblyManager
         return null;
     }
 
+    // this works
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ExecuteAndUnload(bool unload, string assemblyPath, out WeakReference alcWeakRef)
+    {
+        // Create the unloadable HostAssemblyLoadContext
+        var alc = new CollectableAssemblyLoadContext();
+
+        // Create a weak reference to the AssemblyLoadContext that will allow us to detect
+        // when the unload completes.
+        alcWeakRef = new WeakReference(alc);
+
+        // Load the plugin assembly into the HostAssemblyLoadContext.
+        // NOTE: the assemblyPath must be an absolute path.
+        Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
+
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
+        
+        var t = types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!"));
+        t.First().Message("Hi");
+
+        if (unload)
+            alc.Unload();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static ITest Get(string assemblyPath, out WeakReference alcWeakRef)
+    {
+        // Create the unloadable HostAssemblyLoadContext
+        var alc = new CollectableAssemblyLoadContext();
+
+        // Create a weak reference to the AssemblyLoadContext that will allow us to detect
+        // when the unload completes.
+        alcWeakRef = new WeakReference(alc);
+
+        // Load the plugin assembly into the HostAssemblyLoadContext.
+        // NOTE: the assemblyPath must be an absolute path.
+        Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
+
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
+
+        return types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!")).First();
+    }
+
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public IEnumerable<T>? GetImplementationsOf<T>(Assembly? assembly) where T : class
     {
         if (assembly is null) return null;
@@ -176,10 +225,29 @@ public class AssemblyManager
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public void Unload()
     {
         _assemblies.Clear();
-        _newContext = null;
-    }
+        AssemblyLoadContext? context = _newContext.Target as AssemblyLoadContext;
+        if (context != null) {
+            _logger.LogInformation("Unloading context");
+            context.Unload();
+        }
+   }
+
+   public bool IsUnloaded() {
+        // Poll and run GC until the AssemblyLoadContext is unloaded.
+        // You don't need to do that unless you want to know when the context
+        // got unloaded. You can just leave it to the regular GC.
+        for (int i = 0; _newContext.IsAlive && (i < 10); i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Thread.Sleep(100);
+        }
+
+        return !_newContext.IsAlive;
+   }
 
 }

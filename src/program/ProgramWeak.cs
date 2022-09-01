@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿#if false
+using System.Reflection;
 using System.Runtime.Loader;
 using static System.Console;
 using Microsoft.CodeAnalysis;
@@ -13,7 +14,7 @@ var logger = sp.GetLogger<ITest>();
 
 Console.OutputEncoding = Encoding.UTF8; // for ascii chart
 
-List<ITest> tests = new();
+List<WeakReference<ITest>> tests = new();
 var cmd = ' ';
 
 var myContext = AssemblyLoadContext.GetLoadContext(Assembly.GetExecutingAssembly());
@@ -53,81 +54,29 @@ while (true)
     WriteLine($" pressed");
     switch (cmd)
     {
-        case 'z':
-            AssemblyManager.ExecuteAndUnload(true, path.Replace("program", "libB"), out var hostAlcWeakRef);
-            // Poll and run GC until the AssemblyLoadContext is unloaded.
-            // You don't need to do that unless you want to know when the context
-            // got unloaded. You can just leave it to the regular GC.
-            for (int i = 0; hostAlcWeakRef.IsAlive && (i < 10); i++)
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-            }
-
-            Console.WriteLine($"Unload success: {!hostAlcWeakRef.IsAlive}");
-            break;
-            // doesn't work
-        case 'y':
-            {
-                WeakReference hostAlcWeakRef2;
-                {
-                    var t = AssemblyManager.Get(path.Replace("program", "libB"), out hostAlcWeakRef2);
-                    WriteLine(t.Message("HI!!!!!"));
-                }
-                var alc = hostAlcWeakRef2.Target as AssemblyLoadContext;
-                alc!.Unload();
-
-                // Poll and run GC until the AssemblyLoadContext is unloaded.
-                // You don't need to do that unless you want to know when the context
-                // got unloaded. You can just leave it to the regular GC.
-                for (int i = 0; hostAlcWeakRef2.IsAlive && (i < 10); i++)
-                {
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                }
-
-                Console.WriteLine($"Unload success: {!hostAlcWeakRef2.IsAlive}");
-            }
-            break;
-        case 'x':
-            // unloads B, but weak reference doesn't go away
-            {
-                AssemblyManager.ExecuteAndUnload(false, path.Replace("program", "libB"), out var hostAlcWeakRef3);
-                var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
-                alc!.Unload();
-
-                // Poll and run GC until the AssemblyLoadContext is unloaded.
-                // You don't need to do that unless you want to know when the context
-                // got unloaded. You can just leave it to the regular GC.
-                for (int i = 0; hostAlcWeakRef3.IsAlive && (i < 10); i++)
-                {
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                }
-
-                Console.WriteLine($"Unload success: {!hostAlcWeakRef3.IsAlive}");
-            }
-            break;
         case 'q':
             return;
         case 'a':
             {
                 var t = manager!.GetImplementationsOf<ITest>(manager!.LoadAssembly(path.Replace("program", "libA")));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case 'b':
             {
-                manager!.LoadAssembly(path.Replace("program", "libB"));
-                // if (t != null)
-                //     tests.AddRange(t);
+                var t = manager!.GetImplementationsOf<ITest>(manager!.LoadAssembly(path.Replace("program", "libB")));
+                if (t != null)
+                    tests.AddRange(t.Select( o => new WeakReference<ITest>(o)));
             }
             break;
         case 'c':
-            foreach (var t in tests)
+            foreach (var i in tests)
             {
-                WriteLine(t.Message(DateTime.Now.ToString()));
+                if (i.TryGetTarget(out var t))
+                    WriteLine(t.Message(DateTime.Now.ToString()));
+                else
+                    logger.LogWarning("Weak reference gone");
             }
             break;
         case 'd':
@@ -147,11 +96,7 @@ while (true)
             break;
         case 'u':
             manager?.Unload();
-            tests.Clear();
-            WriteLine($"Is unloaded is {manager?.IsUnloaded()}");
-            break;
-        case 't':
-            WriteLine($"Is unloaded is {manager?.IsUnloaded()}");
+            //tests.Clear();
             break;
         case '1':
             for (int i = 0; i < 1; i++)
@@ -159,7 +104,7 @@ while (true)
                 var name = $"Test{i}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 10, "d + 1"));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case '2':
@@ -168,7 +113,7 @@ while (true)
                 var name = $"Test{i}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case '3':
@@ -177,7 +122,7 @@ while (true)
                 var name = $"Test{i}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case 'r':
@@ -188,15 +133,18 @@ while (true)
                 var name = $"Test{loadCount++}";
                 var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 1000, s));
                 if (t != null)
-                    tests.AddRange(t);
+                    tests.AddRange(t.Select(o => new WeakReference<ITest>(o)));
             }
             break;
         case 'p':
-            foreach (var t in tests)
+            foreach (var i in tests)
             {
-                WriteLine($">>>> Chart for {t.Name}");
-                var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
-                WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
+                if (i.TryGetTarget(out var t))
+                {
+                    WriteLine($">>>> Chart for {t.Name}");
+                    var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
+                    WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
+                }
             }
             break;
         case 'g':
@@ -207,3 +155,4 @@ while (true)
             break;
     }
 }
+#endif

@@ -1,0 +1,67 @@
+#!csharp
+
+using static System.Console;
+
+var code = "this is a test";
+//  code = @"
+//     this is a test
+//     ";
+var index = code.IndexOf('a');
+
+var end = code.IndexOf(Environment.NewLine, index);
+var begin = code.LastIndexOf(Environment.NewLine, index);
+
+WriteLine($"{begin}..{end}");
+
+begin = begin < 0 ? 0 : begin + Environment.NewLine.Length;
+end = end < 0 ? code.Length : end;
+
+WriteLine($"{begin}..{end}");
+
+WriteLine($">{code[begin..end]}<");
+
+#!csharp
+
+using static System.Console;
+using System.Threading;
+
+class A {
+    int _i;
+
+    public A(int i) { _i = i; }
+    public void M(int i) {
+        WriteLine($"Hi from {_i} : {i}");
+    }
+}
+
+var items = new List<WeakReference<A>>();
+
+void setup()
+{
+    var a = new A(100);
+    for ( int i = 0; i < 10; i++ ) {
+        items.Add(new WeakReference<A>(new A(i),false));
+    }
+    items.Add(new WeakReference<A>(a,false));
+    WriteLine( $"Ok items is {items.Count(o => o.TryGetTarget(out var x))}");
+    GC.Collect(0);
+    WriteLine( $"Ok items is NOW {items.Count(o => o.TryGetTarget(out var x))}");
+}
+
+setup();
+
+for ( int i = 0; i < 10; i++ ) {
+    foreach ( var item in items ) {
+        if ( item.TryGetTarget(out var a) ) {
+            a.M(i);
+        }
+    }
+    if (i % 2 == 0) {
+        a = null;
+        WriteLine("gc");
+        GC.Collect(0);
+        GC.WaitForPendingFinalizers();
+    }
+    Thread.Sleep(100);
+}
+WriteLine( $"Ok items is NOW {items.Count(o => o.TryGetTarget(out var x))}");
