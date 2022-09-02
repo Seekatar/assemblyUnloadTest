@@ -59,12 +59,19 @@ For `r` you are prompted for a simple math expression. `System.Math` methods are
     0.00 ┼──────────╯
 ```
 
+## Notes
 
+From [here](https://docs.microsoft.com/en-us/dotnet/standard/assembly/unloadability)
+
+The AssemblyLoadContext-derived class returns null to indicate that it should be loaded into the default context from locations that the runtime uses to load assemblies by default.
+
+After the calling a method in the loaded assembly, you can initiate unloading by either calling the Unload method on the custom AssemblyLoadContext or getting rid of the reference you have to the AssemblyLoadContext
 
 ## Links
 
 - [MS Doc: AssemblyLoadContext Class](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext)
 - [MS Doc: How to use and debug assembly unloadability in .NET Core](https://docs.microsoft.com/en-us/dotnet/standard/assembly/unloadability)
 - [MS Doc: Understanding System.Runtime.Loader.AssemblyLoadContext](https://docs.microsoft.com/en-us/dotnet/core/dependency-loading/understanding-assemblyloadcontext)
+- [MS Doc: How to use and debug assembly unloadability in .NET Core](https://docs.microsoft.com/en-us/dotnet/standard/assembly/unloadability)
 - [Exploring the new Assembly unloading feature in .NET Core 3.0 by building a simple plugin system running on ASP.NET Core Blazor](https://stevenknox.net/exploring-assembly-unloading-in-net-core-3-0-by-building-a-simple-plugin-architecture/) by Steve Knox
 - [Ascii Chart C#](https://github.com/NathanBaulch/asciichart-sharp)

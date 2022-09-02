@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using SerilogTimings;
+using static System.Console;
 
 namespace AssemblyContextTest;
 
@@ -30,9 +31,8 @@ public class AssemblyManager
     }
 
     private readonly ILogger<AssemblyManager> _logger;
-    private WeakReference _newContext = new (new CollectableAssemblyLoadContext());
+    private WeakReference _newContext = new(new CollectableAssemblyLoadContext());
 
-    private List<Assembly> _assemblies = new();
     private List<PortableExecutableReference> _references = new();
     private int _loadCount = 1;
     public AssemblyManager(ILogger<AssemblyManager> logger)
@@ -48,6 +48,7 @@ public class AssemblyManager
         _logger.LogInformation($"Context {context.Name} unloading!");
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public IEnumerable<T>? BuildAndGet<T>(string name, string code) where T : class
     {
         var (p, pdb) = BuildAssembly(name, code);
@@ -88,27 +89,16 @@ public class AssemblyManager
 
         try
         {
-            var assembly = context?.LoadFromStream(s, pdbStream);
-
-            if (assembly is not null)
-            {
-                _assemblies.Add(assembly);
-
-                // it will be our context, this would show that
-                // AssemblyLoadContext.GetLoadContext(assembly);
-
-                return assembly;
-            }
+            return context?.LoadFromStream(s, pdbStream);
         }
         finally
         {
             fs?.Close();
             fs?.Dispose();
         }
-        return null;
     }
 
-    // this works
+    // this works from example
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void ExecuteAndUnload(bool unload, string assemblyPath, out WeakReference alcWeakRef)
     {
@@ -124,7 +114,7 @@ public class AssemblyManager
         Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
 
         var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
-        
+
         var t = types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!"));
         t.First().Message("Hi");
 
@@ -132,6 +122,7 @@ public class AssemblyManager
             alc.Unload();
     }
 
+    // modified from example since returns ITest, doesn't unload
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static ITest Get(string assemblyPath, out WeakReference alcWeakRef)
     {
@@ -146,9 +137,20 @@ public class AssemblyManager
         // NOTE: the assemblyPath must be an absolute path.
         Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
 
+        alc = null;
+
         var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
 
         return types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!")).First();
+    }
+
+    // modified from example since returns ITest, doesn't unload
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void GetAndCall(string assemblyPath, out WeakReference alcWeakRef)
+    {
+        var t = Get(assemblyPath, out alcWeakRef);
+        WriteLine(t.Message("From GetAndCall"));
+
     }
 
 
@@ -228,7 +230,6 @@ public class AssemblyManager
     [MethodImpl(MethodImplOptions.NoInlining)]
     public void Unload()
     {
-        _assemblies.Clear();
         AssemblyLoadContext? context = _newContext.Target as AssemblyLoadContext;
         if (context != null) {
             _logger.LogInformation("Unloading context");

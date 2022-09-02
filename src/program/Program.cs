@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using AssemblyContextTest;
+using program;
 
 Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 var config = ConsoleBasics.BuildConfiguration();
@@ -43,6 +44,7 @@ public class {0} : ITest
 ";
 
 var manager = new AssemblyManager(sp.GetLogger<AssemblyManager>());
+var testCollection = new TestCollection(manager);
 
 var path = Assembly.GetExecutingAssembly().Location;
 while (true)
@@ -54,6 +56,7 @@ while (true)
     switch (cmd)
     {
         case 'z':
+            // pretty much sample, works since self contained
             AssemblyManager.ExecuteAndUnload(true, path.Replace("program", "libB"), out var hostAlcWeakRef);
             // Poll and run GC until the AssemblyLoadContext is unloaded.
             // You don't need to do that unless you want to know when the context
@@ -66,13 +69,14 @@ while (true)
 
             Console.WriteLine($"Unload success: {!hostAlcWeakRef.IsAlive}");
             break;
-            // doesn't work
         case 'y':
+            // doesn't work since t returned
             {
                 WeakReference hostAlcWeakRef2;
                 {
                     var t = AssemblyManager.Get(path.Replace("program", "libB"), out hostAlcWeakRef2);
                     WriteLine(t.Message("HI!!!!!"));
+                    t = null;
                 }
                 var alc = hostAlcWeakRef2.Target as AssemblyLoadContext;
                 alc!.Unload();
@@ -90,7 +94,7 @@ while (true)
             }
             break;
         case 'x':
-            // unloads B, but weak reference doesn't go away
+            // works
             {
                 AssemblyManager.ExecuteAndUnload(false, path.Replace("program", "libB"), out var hostAlcWeakRef3);
                 var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
@@ -99,13 +103,43 @@ while (true)
                 // Poll and run GC until the AssemblyLoadContext is unloaded.
                 // You don't need to do that unless you want to know when the context
                 // got unloaded. You can just leave it to the regular GC.
-                for (int i = 0; hostAlcWeakRef3.IsAlive && (i < 10); i++)
+                for (int i = 0; hostAlcWeakRef3.IsAlive && (i < 100); i++)
                 {
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
+                    Thread.Sleep(2);
                 }
 
                 Console.WriteLine($"Unload success: {!hostAlcWeakRef3.IsAlive}");
+            }
+            break;
+        case 'w':
+            // works
+            {
+                AssemblyManager.GetAndCall( path.Replace("program", "libB"), out var hostAlcWeakRef3);
+                var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
+                alc!.Unload();
+
+                // Poll and run GC until the AssemblyLoadContext is unloaded.
+                // You don't need to do that unless you want to know when the context
+                // got unloaded. You can just leave it to the regular GC.
+                for (int i = 0; hostAlcWeakRef3.IsAlive && (i < 100); i++)
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    Thread.Sleep(2);
+                }
+
+                Console.WriteLine($"Unload success: {!hostAlcWeakRef3.IsAlive}");
+            }
+            break;
+        case 'v':
+            // ???
+            {
+                testCollection.Load(path.Replace("program", "libB"));
+                Thread.Sleep(3000);
+                testCollection.Call();
+                testCollection.Unload();
             }
             break;
         case 'q':
