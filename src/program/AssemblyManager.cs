@@ -153,6 +153,24 @@ public class AssemblyManager
 
     }
 
+    // modified from example since returns ITest, doesn't unload
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static ITest? Get(string assemblyPath, WeakReference alcWeakRef)
+    {
+        var alc = alcWeakRef.Target as AssemblyLoadContext;
+        if (alc is null) { WriteLine("alc is null"); return null; }
+        
+        // Load the plugin assembly into the HostAssemblyLoadContext.
+        // NOTE: the assemblyPath must be an absolute path.
+        Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
+
+        alc = null;
+
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
+
+        return types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!")).First();
+    }
+
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public IEnumerable<T>? GetImplementationsOf<T>(Assembly? assembly) where T : class

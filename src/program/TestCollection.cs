@@ -14,7 +14,7 @@ namespace program
     {
         private readonly AssemblyManager _manager;
         private List<ITest>? _tests = new();
-        WeakReference hostAlcWeakRef2;
+        AssemblyLoadContext _alc;
         
         public TestCollection(AssemblyManager manager)
         {
@@ -24,9 +24,27 @@ namespace program
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal void Load(string path)
         {
-            var t = AssemblyManager.Get(path.Replace("program", "libB"), out hostAlcWeakRef2);
+            WeakReference wr;
+            var t = AssemblyManager.Get(path.Replace("program", "libB"), out wr);
+            _alc = wr.Target as AssemblyLoadContext;
             WriteLine(t.Message("HI from TestCollection!!!!!"));
             _tests.Add(t);
+            //t = null;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal void LoadAnother(string path)
+        {
+            
+            var t = AssemblyManager.Get(path.Replace("program", "libB"), new WeakReference(_alc));
+            if (t is not null)
+            {
+                WriteLine(t.Message("HI from TestCollection!!!!!"));
+                _tests.Add(t);
+            } else
+            {
+                WriteLine("t is null");
+            }
             //t = null;
         }
 
@@ -45,21 +63,24 @@ namespace program
         {
             _tests = new();
             
-            var alc = hostAlcWeakRef2.Target as AssemblyLoadContext;
-            alc!.Unload();
+            var alc = _alc;
+            if (alc is null) { Console.Write("alc null in unload"); return; }
+            alc.Unload();
+            var wr = new WeakReference(alc);
             alc = null;
+            _alc = null;
 
             // Poll and run GC until the AssemblyLoadContext is unloaded.
             // You don't need to do that unless you want to know when the context
             // got unloaded. You can just leave it to the regular GC.
-            for (int i = 0; hostAlcWeakRef2.IsAlive && (i < 100); i++)
+            for (int i = 0; wr.IsAlive && (i < 100); i++)
             {
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 Thread.Sleep(4);
             }
 
-            Console.WriteLine($"Unload success: {!hostAlcWeakRef2.IsAlive}");
+            Console.WriteLine($"Unload success: {!wr.IsAlive}");
         }
     }
 }

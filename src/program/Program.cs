@@ -134,9 +134,19 @@ while (true)
             }
             break;
         case 'v':
+            // works
+            {
+                testCollection.Load(path.Replace("program", "libB"));
+                Thread.Sleep(3000);
+                testCollection.Call();
+                testCollection.Unload();
+            }
+            break;
+        case '9':
             // ???
             {
                 testCollection.Load(path.Replace("program", "libB"));
+                testCollection.LoadAnother(path.Replace("program", "libA"));
                 Thread.Sleep(3000);
                 testCollection.Call();
                 testCollection.Unload();
