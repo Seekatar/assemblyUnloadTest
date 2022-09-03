@@ -82,5 +82,10 @@ namespace program
 
             Console.WriteLine($"Unload success: {!wr.IsAlive}");
         }
+
+        internal ITest? Get(string assyName)
+        {
+            return _tests.FirstOrDefault();
+        }
     }
 }
