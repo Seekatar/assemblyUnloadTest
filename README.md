@@ -67,6 +67,17 @@ The AssemblyLoadContext-derived class returns null to indicate that it should be
 
 After the calling a method in the loaded assembly, you can initiate unloading by either calling the Unload method on the custom AssemblyLoadContext or getting rid of the reference you have to the AssemblyLoadContext
 
+## Design
+
+Load assemblies
+  AssemblyManager<T>()
+  Load(into named bucket)
+  Unload(bucketName)
+  Type Array internally
+  Create with Activator on demand <T>Create(name, args)
+  
+  Register with DI and then they can inject, or call us on demand << won't that create hard dep in the ServiceLocator? So can't unload
+
 ## Links
 
 - [MS Doc: AssemblyLoadContext Class](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext)

@@ -279,7 +279,8 @@ public class {0} : ITest
     {
         testCollection.Load(path.Replace("program", "libB"));
         Thread.Sleep(3000);
-        WriteLine(engine.DoIt(testCollection.Get("libB")));
+        var lib = testCollection.Get("libB");
+        WriteLine(engine.DoIt(lib));
         testCollection.Unload();
 
     }

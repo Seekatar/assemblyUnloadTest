@@ -73,11 +73,11 @@ namespace program
             // Poll and run GC until the AssemblyLoadContext is unloaded.
             // You don't need to do that unless you want to know when the context
             // got unloaded. You can just leave it to the regular GC.
-            for (int i = 0; wr.IsAlive && (i < 100); i++)
+            for (int i = 0; wr.IsAlive && (i < 10); i++)
             {
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                Thread.Sleep(4);
+                Thread.Sleep(100);
             }
 
             Console.WriteLine($"Unload success: {!wr.IsAlive}");
