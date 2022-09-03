@@ -31,37 +31,40 @@ public class Engine
         }
     }
 
-    internal void Build(int count, string name, string code)
+    internal void Build(int count, string name, string code, string? contextName = null)
     {
         for (int i = 0; i < count; i++)
         {
-            var fullName = $"{name}-{count}";
+            var fullName = $"{name}-{i}";
             var (pe, _) = _builder.BuildAssembly(fullName, code);
-            _manager.LoadFromStream(fullName, pe);
-            var t = _manager.CreateInstance<ITest>(fullName);
-            if (t != null)
+            if (pe != null)
             {
-                _tests.Add(t);
-            }
-            else
-            {
-                _logger.LogWarning("Didn't create {assemblyName}", fullName);
+                _manager.LoadFromStream(fullName, pe, contextName: contextName);
+                var t = _manager.CreateInstance<ITest>(fullName, contextName);
+                if (t != null)
+                {
+                    _tests.Add(t);
+                }
+                else
+                {
+                    _logger.LogWarning("Didn't create {assemblyName}", fullName);
+                }
             }
         }
     }
 
-    internal void Load(string path, string name)
+    internal void Load(string path, string name, string? contextName = null)
     {
-        _manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"));
+        _manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"), contextName);
         var t = _manager.CreateInstance<ITest>(name);
         if (t != null)
             _tests.Add(t);
     }
 
-    internal void Unload()
+    internal void Unload(string? contextName = null)
     {
         _tests = new List<ITest>();
-        _manager.Unload();
+        _manager.Unload(contextName);
     }
 
     internal void DoOnAll(Action<ITest> action)

@@ -43,8 +43,10 @@ public class AssemblyManager<T>
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public bool LoadFromAssemblyPath(string name, string fileName, string contextName = FirstContextName)
+    public bool LoadFromAssemblyPath(string name, string fileName, string? contextName = null)
     {
+        contextName ??= FirstContextName;
+
         var context = CheckContext(contextName);
 
         _logger.LogInformation("Loading {assemblyName} into context.", name);
@@ -65,8 +67,9 @@ public class AssemblyManager<T>
         return context;
     }
 
-    public Assembly? LoadFromStream(string name, Stream s, Stream? pdbStream = null, string contextName = FirstContextName)
+    public Assembly? LoadFromStream(string name, Stream s, Stream? pdbStream = null, string? contextName = null)
     {
+        contextName ??= FirstContextName;
         if (s is null) return null;
 
         var context = CheckContext(contextName);
@@ -81,25 +84,41 @@ public class AssemblyManager<T>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public TObj? CreateInstance<TObj>(string name, params object?[]? args) where TObj : class
     {
-        var assembly = _contexts.Values.SelectMany(o => o.LoadedAssemblies.Where(o => o.Key == name).Select(o => o.Value)).FirstOrDefault();
-        if (assembly == null)
-        {
-            _logger.LogWarning("Didn't find assembly for {assemblyName}", name);
-            return null;
-        }
-        var type = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(TObj)))?.FirstOrDefault();
-        if (type == null)
-        {
-            _logger.LogWarning("Didn't type of {typeName} in {assemblyName}", typeof(TObj).Name, name);
-            return null;
-        }
-
-        return Activator.CreateInstance(type, args) as TObj;
+        return CreateInstance<TObj>(name, FirstContextName, args);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public void Unload(string contextName = FirstContextName)
+    public TObj? CreateInstance<TObj>(string name, string? contextName, params object?[]? args) where TObj : class
     {
+        contextName ??= FirstContextName;
+        if (_contexts.TryGetValue(contextName, out var context))
+        {
+            var assembly = context.LoadedAssemblies.Where(o => o.Key == name).Select(o => o.Value).FirstOrDefault();
+            if (assembly == null)
+            {
+                _logger.LogWarning("Didn't find assembly for {assemblyName}", name);
+                return null;
+            }
+            var type = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(TObj)))?.FirstOrDefault();
+            if (type == null)
+            {
+                _logger.LogWarning("Didn't type of {typeName} in {assemblyName}", typeof(TObj).Name, name);
+                return null;
+            }
+
+            return Activator.CreateInstance(type, args) as TObj;
+        }
+        else
+        {
+            _logger.LogWarning("Didn't find context name of {contextName}", contextName);
+            return null;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public void Unload(string? contextName = null)
+    {
+        contextName ??= FirstContextName;
 
         if (!_contexts.TryGetValue(contextName, out var context)) return;
         context.LoadedAssemblies = new(); // MUST do this or else ALC won't unload
@@ -112,8 +131,10 @@ public class AssemblyManager<T>
         context.Unload();
     }
 
-    public bool IsUnloaded(string contextName = FirstContextName)
+    public bool IsUnloaded(string? contextName = null)
     {
+        contextName ??= FirstContextName;
+
         if (!_contexts.TryGetValue(contextName, out var context)) return true;
 
         return !_deadContext.IsAlive;

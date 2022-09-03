@@ -82,6 +82,9 @@ public class {0} : ITest
                 case 'b':
                     engine.Load(path, "B");
                     break;
+                case 'B':
+                    engine.Load(path, "B", "ALT");
+                    break;
                 case 'c': // call
                     engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")));
                     break;
@@ -93,12 +96,20 @@ public class {0} : ITest
                     engine.Unload();
                     tests.Clear();
                     break;
+                case 'U': // unload
+                    engine.Unload("ALT");
+                    tests.Clear();
+                    break;
                 case 't': // test
                     WriteLine($"Is unloaded is {engine.IsUnloaded()}");
                     break;
                 case '1':
                     var name = $"ATest1";
                     engine.Build(1, name, string.Format(code, name, 10, "d + 1"));
+                    break;
+                case '!':
+                    name = $"ATest1";
+                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"), "ALT");
                     break;
                 case '2':
                     name = $"ATest2";
