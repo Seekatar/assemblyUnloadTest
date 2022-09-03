@@ -7,6 +7,19 @@ using Microsoft.Extensions.Logging;
 using AssemblyContextTest;
 using program;
 using System.Runtime.CompilerServices;
+using Elasticsearch.Net;
+using System.Xml.Linq;
+
+class C
+{
+    string _s;
+    public C(string s)
+    {
+        _s = s;
+        WriteLine($">>>> CCCCCCCCCCCCCCC {s}");
+    }
+    ~C() { WriteLine($"~~~~ CCCCCCCCCCCCCCCCCCCCC {_s}");  }
+}
 
 public static class Program
 {
@@ -43,13 +56,14 @@ public class {0} : ITest
     public double Value(double d) => {2};
 
     ~{0} () {{
-        WriteLine(""^^^^ {0} destroyed!"");
+        WriteLine(""~~~~ {0} destroyed!"");
     }}
 }}
 ";
 
-        var manager = new AssemblyManager(sp.GetLogger<AssemblyManager>());
-        var testCollection = new TestCollection(manager);
+        var managerOrig = new AssemblyManagerOrig(sp.GetLogger<AssemblyManagerOrig>());
+        var manager = new AssemblyManager<ITest>(sp.GetLogger<AssemblyManager<ITest>>());
+        var testCollection = new TestCollection(managerOrig);
         var engine = new Engine();
 
         var path = Assembly.GetExecutingAssembly().Location;
@@ -63,7 +77,7 @@ public class {0} : ITest
             {
                 case 'z':
                     // pretty much sample, works since self contained
-                    AssemblyManager.ExecuteAndUnload(true, path.Replace("program", "libB"), out var hostAlcWeakRef);
+                    AssemblyManagerOrig.ExecuteAndUnload(true, path.Replace("program", "libB"), out var hostAlcWeakRef);
                     // Poll and run GC until the AssemblyLoadContext is unloaded.
                     // You don't need to do that unless you want to know when the context
                     // got unloaded. You can just leave it to the regular GC.
@@ -80,7 +94,7 @@ public class {0} : ITest
                     {
                         WeakReference hostAlcWeakRef2;
                         {
-                            var t = AssemblyManager.Get(path.Replace("program", "libB"), out hostAlcWeakRef2);
+                            var t = AssemblyManagerOrig.Get(path.Replace("program", "libB"), out hostAlcWeakRef2);
                             WriteLine(t.Message("HI!!!!!"));
                             t = null;
                         }
@@ -102,7 +116,7 @@ public class {0} : ITest
                 case 'x':
                     // works
                     {
-                        AssemblyManager.ExecuteAndUnload(false, path.Replace("program", "libB"), out var hostAlcWeakRef3);
+                        AssemblyManagerOrig.ExecuteAndUnload(false, path.Replace("program", "libB"), out var hostAlcWeakRef3);
                         var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
                         alc!.Unload();
 
@@ -122,7 +136,7 @@ public class {0} : ITest
                 case 'w':
                     // works
                     {
-                        AssemblyManager.GetAndCall(path.Replace("program", "libB"), out var hostAlcWeakRef3);
+                        AssemblyManagerOrig.GetAndCall(path.Replace("program", "libB"), out var hostAlcWeakRef3);
                         var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
                         alc!.Unload();
 
@@ -168,23 +182,36 @@ public class {0} : ITest
                     }
                     break;
                 case '7':
-                    // yes, after a couple gcs
+                    // yes, after a couple gcs, first destroys libB, second unloads assy
                     {
                         doit(path, engine, testCollection);
+                    }
+                    break;
+                case '6':
+                    // works after two gcs!
+                    {
+                        doitNew(path, engine, manager);
+                    }
+                    break;
+                case 'f':
+                    {
+                        var c = new C("in switch");
+                        c = null;
+                        newC();
                     }
                     break;
                 case 'q':
                     return;
                 case 'a':
                     {
-                        var t = manager!.GetImplementationsOf<ITest>(manager!.LoadAssembly(path.Replace("program", "libA")));
+                        var t = managerOrig!.GetImplementationsOf<ITest>(managerOrig!.LoadAssembly(path.Replace("program", "libA")));
                         if (t != null)
                             tests.AddRange(t);
                     }
                     break;
                 case 'b':
                     {
-                        manager!.LoadAssembly(path.Replace("program", "libB"));
+                        managerOrig!.LoadAssembly(path.Replace("program", "libB"));
                         // if (t != null)
                         //     tests.AddRange(t);
                     }
@@ -211,18 +238,18 @@ public class {0} : ITest
                     }
                     break;
                 case 'u':
-                    manager?.Unload();
+                    managerOrig?.Unload();
                     tests.Clear();
-                    WriteLine($"Is unloaded is {manager?.IsUnloaded()}");
+                    WriteLine($"Is unloaded is {managerOrig?.IsUnloaded()}");
                     break;
                 case 't':
-                    WriteLine($"Is unloaded is {manager?.IsUnloaded()}");
+                    WriteLine($"Is unloaded is {managerOrig?.IsUnloaded()}");
                     break;
                 case '1':
                     for (int i = 0; i < 1; i++)
                     {
                         var name = $"Test{i}";
-                        var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 10, "d + 1"));
+                        var t = managerOrig!.BuildAndGet<ITest>(name, string.Format(code, name, 10, "d + 1"));
                         if (t != null)
                             tests.AddRange(t);
                     }
@@ -231,7 +258,7 @@ public class {0} : ITest
                     for (int i = 0; i < 100; i++)
                     {
                         var name = $"Test{i}";
-                        var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
+                        var t = managerOrig!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
                         if (t != null)
                             tests.AddRange(t);
                     }
@@ -240,20 +267,35 @@ public class {0} : ITest
                     for (int i = 0; i < 1000; i++)
                     {
                         var name = $"Test{i}";
-                        var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
+                        var t = managerOrig!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
                         if (t != null)
                             tests.AddRange(t);
                     }
                     break;
                 case 'r':
-                    WriteLine("Enter equation using 'd'");
-                    var s = ReadLine();
-                    if (!string.IsNullOrEmpty(s))
                     {
-                        var name = $"Test{loadCount++}";
-                        var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 1000, s));
-                        if (t != null)
-                            tests.AddRange(t);
+                        WriteLine("Enter equation using 'd'");
+                        var s = ReadLine();
+                        if (!string.IsNullOrEmpty(s))
+                        {
+                            var name = $"ATest{loadCount++}";
+                            plotIt(name, string.Format(code, name, 1000, s), engine, manager);
+                        }
+                    }
+                    break;
+                case 's':
+                    {
+                        // this doesn't unload the assy even though exactly like the plotIt fn since we're in main
+                        WriteLine("Enter equation using 'd'");
+                        var s = ReadLine();
+                        if (!string.IsNullOrEmpty(s))
+                        {
+                            var name = $"ATest{loadCount++}";
+                            var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 1000, s)).First();
+                            WriteLine(engine.DoIt(t));
+                            Thread.Sleep(3000);
+                            manager.Unload();
+                        }
                     }
                     break;
                 case 'p':
@@ -273,8 +315,8 @@ public class {0} : ITest
             }
         }
     }
-    
-    [MethodImpl(MethodImplOptions.NoInlining)]
+
+    //[MethodImpl(MethodImplOptions.NoInlining)]
     static void doit(string path, Engine engine, TestCollection testCollection)
     {
         testCollection.Load(path.Replace("program", "libB"));
@@ -284,5 +326,31 @@ public class {0} : ITest
         testCollection.Unload();
 
     }
+    static void plotIt(string name, string code, Engine engine, AssemblyManager<ITest> manager)
+    {
+        var t = manager!.BuildAndGet<ITest>(name, code).First();
+        WriteLine(engine.DoIt(t));
+        Thread.Sleep(3000);
+        manager.Unload();
+    }
 
+    static void doitNew(string path, Engine engine, AssemblyManager<ITest> manager)
+    {
+        manager.Load(path.Replace("program", "libB"));
+        WriteLine(engine.DoIt(manager.Get<ITest>(path.Replace("program", "libB"))));
+        Thread.Sleep(3000);
+        manager.Unload();
+    }
+    static void doitNewOk(string path, Engine engine, AssemblyManager<ITest> manager)
+    {
+        var test = manager.LoadAndGet<ITest>(path.Replace("program", "libB"));
+        WriteLine(engine.DoIt(test));
+        Thread.Sleep(3000);
+        manager.Unload();
+    }
+    static void newC()
+    {
+        var c = new C("in fn");
+        c = null;
+    }
 }

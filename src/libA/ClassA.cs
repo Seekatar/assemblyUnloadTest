@@ -29,7 +29,7 @@ public class ClassA : ITest
     public double Value(double d) => d + 10;
 
     ~ClassA () {
-        WriteLine("AAAAAAAAAAAAAAAAAAAAAAAAAA!");
+        WriteLine("~~~~ AAAAAAAAAAAAAAAAAAAAAAAAAA!");
     }
 }
 

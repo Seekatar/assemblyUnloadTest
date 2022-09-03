@@ -10,6 +10,6 @@ public class ClassB : ITest
     public double Value(double d) => d + 100;
 
     ~ClassB () {
-        WriteLine("BBBBBBBBBBBBBBBBBBBBBBBBBBB!");
+        WriteLine("~~~~ BBBBBBBBBBBBBBBBBBBBBBBBBBB!");
     }
 }

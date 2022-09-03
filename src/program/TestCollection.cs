@@ -12,11 +12,11 @@ namespace program
 {
     internal class TestCollection
     {
-        private readonly AssemblyManager _manager;
+        private readonly AssemblyManagerOrig _manager;
         private List<ITest>? _tests = new();
         AssemblyLoadContext _alc;
-        
-        public TestCollection(AssemblyManager manager)
+
+        public TestCollection(AssemblyManagerOrig manager)
         {
             _manager = manager;
         }
@@ -25,7 +25,7 @@ namespace program
         internal void Load(string path)
         {
             WeakReference wr;
-            var t = AssemblyManager.Get(path.Replace("program", "libB"), out wr);
+            var t = AssemblyManagerOrig.Get(path.Replace("program", "libB"), out wr);
             _alc = wr.Target as AssemblyLoadContext;
             WriteLine(t.Message("HI from TestCollection!!!!!"));
             _tests.Add(t);
@@ -35,8 +35,8 @@ namespace program
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal void LoadAnother(string path)
         {
-            
-            var t = AssemblyManager.Get(path.Replace("program", "libB"), new WeakReference(_alc));
+
+            var t = AssemblyManagerOrig.Get(path.Replace("program", "libB"), new WeakReference(_alc));
             if (t is not null)
             {
                 WriteLine(t.Message("HI from TestCollection!!!!!"));
@@ -62,7 +62,7 @@ namespace program
         internal void Unload()
         {
             _tests = new();
-            
+
             var alc = _alc;
             if (alc is null) { Console.Write("alc null in unload"); return; }
             alc.Unload();

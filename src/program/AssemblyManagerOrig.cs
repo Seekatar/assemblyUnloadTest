@@ -11,15 +11,11 @@ using static System.Console;
 
 namespace AssemblyContextTest;
 
-public class AssemblyManager<T>
+public class AssemblyManagerOrig
 {
     private class CollectableAssemblyLoadContext : AssemblyLoadContext
     {
         public CollectableAssemblyLoadContext() : base(isCollectible: true)
-        {
-        }
-
-        public CollectableAssemblyLoadContext(string name) : base(name, isCollectible: true)
         {
         }
 
@@ -34,15 +30,12 @@ public class AssemblyManager<T>
         }
     }
 
-    private readonly ILogger<AssemblyManager<T>> _logger;
-    private CollectableAssemblyLoadContext _context = new();
-    private WeakReference _deadContext = new(null);
+    private readonly ILogger<AssemblyManagerOrig> _logger;
+    private WeakReference _newContext = new(new CollectableAssemblyLoadContext());
+
     private List<PortableExecutableReference> _references = new();
-
     private int _loadCount = 1;
-    private List<Assembly> _assemblies = new();
-
-    public AssemblyManager(ILogger<AssemblyManager<T>> logger)
+    public AssemblyManagerOrig(ILogger<AssemblyManagerOrig> logger)
     {
         var trustedAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
         var trustedAssemblyPaths = trustedAssemblies.Split(Path.PathSeparator);
@@ -73,15 +66,20 @@ public class AssemblyManager<T>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public Assembly? LoadAssembly(string name, Stream? s = null, Stream? pdbStream = null)
     {
-        if (_context == null)
+        AssemblyLoadContext? context = _newContext.Target as AssemblyLoadContext;
+        if (context == null)
         {
-            _context = new CollectableAssemblyLoadContext($"NewContext{_loadCount++}");
+            context = new AssemblyLoadContext($"NewContext{_loadCount++}", isCollectible: true);
+            // context.Unloading += unloading;
+            _newContext = new WeakReference(context);
             _logger.LogInformation("Created new context");
         }
 
         _logger.LogInformation($"Loading {name} into context.");
-        _logger.LogInformation($"Context currently has {_context.Assemblies.Count()} assemblies");
+        _logger.LogInformation($"Context currently has {context.Assemblies.Count()} assemblies");
 
+        // var assembly = Assembly.LoadFrom(fname); load into default context
+        // var assembly = newContext?.LoadFromAssemblyPath(fname); // locks assembly, even unload doesn't unlock it
         FileStream? fs = null;
         if (s == null)
         {
@@ -91,7 +89,7 @@ public class AssemblyManager<T>
 
         try
         {
-            return _context.LoadFromStream(s, pdbStream);
+            return context?.LoadFromStream(s, pdbStream);
         }
         finally
         {
@@ -100,46 +98,88 @@ public class AssemblyManager<T>
         }
     }
 
+    // this works from example
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public bool Load(string assemblyPath)
+    public static void ExecuteAndUnload(bool unload, string assemblyPath, out WeakReference alcWeakRef)
     {
-        Assembly assembly = _context.LoadFromAssemblyPath(assemblyPath);
+        // Create the unloadable HostAssemblyLoadContext
+        var alc = new CollectableAssemblyLoadContext();
 
-        if (assembly is null) return false;
+        // Create a weak reference to the AssemblyLoadContext that will allow us to detect
+        // when the unload completes.
+        alcWeakRef = new WeakReference(alc);
 
-        _assemblies.Add(assembly);
+        // Load the plugin assembly into the HostAssemblyLoadContext.
+        // NOTE: the assemblyPath must be an absolute path.
+        Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
 
-        return true;
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
+
+        var t = types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!"));
+        t.First().Message("Hi");
+
+        if (unload)
+            alc.Unload();
     }
 
+    // modified from example since returns ITest, doesn't unload
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public TObj? Get<TObj>(string assemblyPath) where TObj : class
+    public static ITest Get(string assemblyPath, out WeakReference alcWeakRef)
     {
-        var type = _assemblies.FirstOrDefault()?.GetTypes().Where(o => o.IsAssignableTo(typeof(TObj)))?.FirstOrDefault();
-        if (type == null) return null;
-        
-        return Activator.CreateInstance(type) as TObj;
+        // Create the unloadable HostAssemblyLoadContext
+        var alc = new CollectableAssemblyLoadContext();
+
+        // Create a weak reference to the AssemblyLoadContext that will allow us to detect
+        // when the unload completes.
+        alcWeakRef = new WeakReference(alc);
+
+        // Load the plugin assembly into the HostAssemblyLoadContext.
+        // NOTE: the assemblyPath must be an absolute path.
+        Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
+
+        alc = null;
+
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
+
+        return types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!")).First();
     }
 
+    // modified from example since returns ITest, doesn't unload
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public TObj? LoadAndGet<TObj>(string assemblyPath) where TObj : class
+    public static void GetAndCall(string assemblyPath, out WeakReference alcWeakRef)
     {
-        Assembly assembly = _context.LoadFromAssemblyPath(assemblyPath);
+        var t = Get(assemblyPath, out alcWeakRef);
+        WriteLine(t.Message("From GetAndCall"));
 
-        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(TObj)));
+    }
 
-        return types.Select(o => Activator.CreateInstance(o) as TObj ?? throw new Exception("ow!")).First();
+    // modified from example since returns ITest, doesn't unload
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static ITest? Get(string assemblyPath, WeakReference alcWeakRef)
+    {
+        var alc = alcWeakRef.Target as AssemblyLoadContext;
+        if (alc is null) { WriteLine("alc is null"); return null; }
+
+        // Load the plugin assembly into the HostAssemblyLoadContext.
+        // NOTE: the assemblyPath must be an absolute path.
+        Assembly assembly = alc.LoadFromAssemblyPath(assemblyPath);
+
+        alc = null;
+
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(ITest)));
+
+        return types.Select(o => Activator.CreateInstance(o) as ITest ?? throw new Exception("ow!")).First();
     }
 
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public IEnumerable<TObj>? GetImplementationsOf<TObj>(Assembly? assembly) where TObj : class
+    public IEnumerable<T>? GetImplementationsOf<T>(Assembly? assembly) where T : class
     {
         if (assembly is null) return null;
 
-        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(TObj)));
-        _logger.LogInformation($"Found {types.Count()} {typeof(TObj).Name}");
-        return types.Select(o => Activator.CreateInstance(o) as TObj ?? throw new Exception("ow!"));
+        var types = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(T)));
+        _logger.LogInformation($"Found {types.Count()} {typeof(T).Name}");
+        return types.Select(o => Activator.CreateInstance(o) as T ?? throw new Exception("ow!"));
     }
 
     private bool CheckForErrors(List<Diagnostic> diag, string? code = null)
@@ -150,8 +190,7 @@ public class AssemblyManager<T>
         foreach (var e in diag.Where(o => o.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning))
         {
             _logger.LogInformation($"   {e.ToString()}");
-            if (code != null)
-            {
+            if (code != null) {
                 var index = e.Location.SourceSpan.Start;
                 var end = code.IndexOf(Environment.NewLine, index);
                 var begin = code.LastIndexOf(Environment.NewLine, index);
@@ -209,19 +248,25 @@ public class AssemblyManager<T>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public void Unload()
     {
-        _assemblies = new();
-        if (_context != null)
-        {
-            _deadContext = new WeakReference(_context);
-            _logger.LogInformation($"Unloading context {_context.Name}");
-            _context = new(); // allow GC to collect existing one
-            _context.Unload();
+        AssemblyLoadContext? context = _newContext.Target as AssemblyLoadContext;
+        if (context != null) {
+            _logger.LogInformation("Unloading context");
+            context.Unload();
         }
-    }
+   }
 
-    public bool IsUnloaded()
-    {
-        return !_deadContext.IsAlive;
-    }
+   public bool IsUnloaded() {
+        // Poll and run GC until the AssemblyLoadContext is unloaded.
+        // You don't need to do that unless you want to know when the context
+        // got unloaded. You can just leave it to the regular GC.
+        for (int i = 0; _newContext.IsAlive && (i < 10); i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Thread.Sleep(100);
+        }
+
+        return !_newContext.IsAlive;
+   }
 
 }
