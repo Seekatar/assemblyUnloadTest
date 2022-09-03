@@ -38,7 +38,7 @@ public class Engine
             var fullName = $"{name}-{count}";
             var (pe, _) = _builder.BuildAssembly(fullName, code);
             _manager.LoadFromStream(fullName, pe);
-            var t = _manager.CreateInstance<ITest>(name);
+            var t = _manager.CreateInstance<ITest>(fullName);
             if (t != null)
             {
                 _tests.Add(t);
@@ -67,4 +67,7 @@ public class Engine
             action(t);
         }
     }
+
+    internal bool IsUnloaded() => _manager.IsUnloaded();
 }
+ 

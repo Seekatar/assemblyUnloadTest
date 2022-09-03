@@ -102,7 +102,7 @@ public class {0} : ITest
                     tests.Clear();
                     break;
                 case 't': // test
-                    //WriteLine($"Is unloaded is {manager?.IsUnloaded()}");
+                    WriteLine($"Is unloaded is {engine.IsUnloaded()}");
                     break;
                 case '1':
                     var name = $"ATest1";
