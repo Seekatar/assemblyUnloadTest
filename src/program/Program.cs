@@ -94,19 +94,8 @@ public class {0} : ITest
                     engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")));
                     break;
                 case 'd': // dump
-                    WriteLine($"There are {AssemblyLoadContext.All.Count()} contexts");
-                    foreach (var alc in AssemblyLoadContext.All)
-                    {
-                        var assemblies = alc.Assemblies;
-                        WriteLine($"   {alc.Name} with {assemblies.Count()} assemblies");
-                        if (alc.Name != "Default")
-                        {
-                            foreach (var a in assemblies)
-                            {
-                                WriteLine($"        {a.GetName()}");
-                            }
-                        }
-                    }
+                    // inline holds the assyn
+                    dump();
                     break;
                 case 'u': // unload
                     engine.Unload();
@@ -156,6 +145,23 @@ public class {0} : ITest
         }
     }
 
+    static void dump()
+    {
+        WriteLine($"There are {AssemblyLoadContext.All.Count()} contexts");
+        foreach (var alc in AssemblyLoadContext.All)
+        {
+            var assemblies = alc.Assemblies;
+            WriteLine($"  * '{alc.Name}' with {assemblies.Count()} assemblies");
+            if (alc.Name != "Default")
+            {
+                foreach (var a in assemblies)
+                {
+                    WriteLine($"    - {a.GetName()}");
+                }
+            }
+        }
+    }
+    
     static void load(string path, string name, AssemblyManager<ITest> manager, List<ITest> tests )
     {
         manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"));

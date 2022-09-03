@@ -69,13 +69,17 @@ After the calling a method in the loaded assembly, you can initiate unloading by
 
 ## Design
 
+Any use in Main holds the assembly
+Dump inline holds the assembly
+Not wiping the dict on the CollectableAssemblyLoadContext holds the assembly
+
 Load assemblies
   AssemblyManager<T>()
   Load(into named bucket)
   Unload(bucketName)
   Type Array internally
   Create with Activator on demand <T>Create(name, args)
-  
+
   Register with DI and then they can inject, or call us on demand << won't that create hard dep in the ServiceLocator? So can't unload
 
 ## Links

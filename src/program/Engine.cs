@@ -49,9 +49,9 @@ public class Engine
     internal void Load(string path, string name)
     {
         _manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"));
-        //var t = _manager.CreateInstance<ITest>(name);
-        //if (t != null)
-        //    _tests.Add(t);
+        var t = _manager.CreateInstance<ITest>(name);
+        if (t != null)
+            _tests.Add(t);
     }
 
     internal void Unload()
