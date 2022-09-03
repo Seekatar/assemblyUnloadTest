@@ -116,25 +116,25 @@ public class {0} : ITest
                     name = $"ATest3";
                     engine.Build(1000, name, string.Format(code, name, 10, "d *d"));
                     break;
-                //case 'r':
-                //    {
-                //        WriteLine("Enter equation using 'd'");
-                //        var s = ReadLine();
-                //        if (!string.IsNullOrEmpty(s))
-                //        {
-                //            name = $"ATest{loadCount++}";
-                //            plotIt(name, string.Format(code, name, 1000, s), engine, manager);
-                //        }
-                //    }
-                //    break;
-                //case 'p':
-                //    foreach (var t in tests)
-                //    {
-                //        WriteLine($">>>> Chart for {t.Name}");
-                //        var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
-                //        WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
-                //    }
-                //    break;
+                case 'r':
+                    {
+                        WriteLine("Enter equation using 'd'");
+                        var s = ReadLine();
+                        if (!string.IsNullOrEmpty(s))
+                        {
+                            name = $"ATest{loadCount++}";
+                            plotIt(name, string.Format(code, name, 1000, s), engine);
+                        }
+                    }
+                    break;
+                case 'p':
+                    engine.DoOnAll(t =>
+                    {
+                        WriteLine($">>>> Chart for {t.Name}");
+                        var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
+                        WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
+                    });
+                    break;
                 case 'g':
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
@@ -180,12 +180,9 @@ public class {0} : ITest
         testCollection.Unload();
 
     }
-    static void plotIt(string name, string code, Engine engine, AssemblyManager<ITest> manager)
+    static void plotIt(string name, string code, Engine engine)
     {
-        // var t = manager!.BuildAndGet<ITest>(name, code).First();
-        // WriteLine(engine.DoIt(t));
-        // Thread.Sleep(3000);
-        // manager.Unload();
+        engine.Build(1, name, code);
     }
 
     static void doitNew(string path, Engine engine, AssemblyManager<ITest> manager)
