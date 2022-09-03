@@ -14,7 +14,7 @@ public class Engine
     {
         _logger = logger;
         _builder = new AssemblyBuilder<ITest>(logger);
-        _manager = new AssemblyManager<ITest>(logger); 
+        _manager = new AssemblyManager<ITest>(logger);
     }
 
     public string? DoIt(ITest? test)
@@ -43,6 +43,10 @@ public class Engine
             {
                 _tests.Add(t);
             }
+            else
+            {
+                _logger.LogWarning("Didn't create {assemblyName}", fullName);
+            }
         }
     }
 
@@ -70,4 +74,3 @@ public class Engine
 
     internal bool IsUnloaded() => _manager.IsUnloaded();
 }
- 
