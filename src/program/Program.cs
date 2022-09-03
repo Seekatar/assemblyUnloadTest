@@ -9,6 +9,9 @@ using program;
 using System.Runtime.CompilerServices;
 using Elasticsearch.Net;
 using System.Xml.Linq;
+using Seekatar.Tools;
+using static System.Net.Mime.MediaTypeNames;
+using System.IO;
 
 class C
 {
@@ -61,10 +64,7 @@ public class {0} : ITest
 }}
 ";
 
-        var managerOrig = new AssemblyManagerOrig(sp.GetLogger<AssemblyManagerOrig>());
-        var manager = new AssemblyManager<ITest>(sp.GetLogger<AssemblyManager<ITest>>());
-        var testCollection = new TestCollection(managerOrig);
-        var engine = new Engine();
+        var engine = new Engine(logger);
 
         var path = Assembly.GetExecutingAssembly().Location;
         while (true)
@@ -75,124 +75,6 @@ public class {0} : ITest
             WriteLine($" pressed");
             switch (cmd)
             {
-                case 'z':
-                    // pretty much sample, works since self contained
-                    AssemblyManagerOrig.ExecuteAndUnload(true, path.Replace("program", "libB"), out var hostAlcWeakRef);
-                    // Poll and run GC until the AssemblyLoadContext is unloaded.
-                    // You don't need to do that unless you want to know when the context
-                    // got unloaded. You can just leave it to the regular GC.
-                    for (int i = 0; hostAlcWeakRef.IsAlive && (i < 10); i++)
-                    {
-                        GC.Collect();
-                        GC.WaitForPendingFinalizers();
-                    }
-
-                    Console.WriteLine($"Unload success: {!hostAlcWeakRef.IsAlive}");
-                    break;
-                case 'y':
-                    // doesn't work since t returned
-                    {
-                        WeakReference hostAlcWeakRef2;
-                        {
-                            var t = AssemblyManagerOrig.Get(path.Replace("program", "libB"), out hostAlcWeakRef2);
-                            WriteLine(t.Message("HI!!!!!"));
-                            t = null;
-                        }
-                        var alc = hostAlcWeakRef2.Target as AssemblyLoadContext;
-                        alc!.Unload();
-
-                        // Poll and run GC until the AssemblyLoadContext is unloaded.
-                        // You don't need to do that unless you want to know when the context
-                        // got unloaded. You can just leave it to the regular GC.
-                        for (int i = 0; hostAlcWeakRef2.IsAlive && (i < 10); i++)
-                        {
-                            GC.Collect();
-                            GC.WaitForPendingFinalizers();
-                        }
-
-                        Console.WriteLine($"Unload success: {!hostAlcWeakRef2.IsAlive}");
-                    }
-                    break;
-                case 'x':
-                    // works
-                    {
-                        AssemblyManagerOrig.ExecuteAndUnload(false, path.Replace("program", "libB"), out var hostAlcWeakRef3);
-                        var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
-                        alc!.Unload();
-
-                        // Poll and run GC until the AssemblyLoadContext is unloaded.
-                        // You don't need to do that unless you want to know when the context
-                        // got unloaded. You can just leave it to the regular GC.
-                        for (int i = 0; hostAlcWeakRef3.IsAlive && (i < 100); i++)
-                        {
-                            GC.Collect();
-                            GC.WaitForPendingFinalizers();
-                            Thread.Sleep(2);
-                        }
-
-                        Console.WriteLine($"Unload success: {!hostAlcWeakRef3.IsAlive}");
-                    }
-                    break;
-                case 'w':
-                    // works
-                    {
-                        AssemblyManagerOrig.GetAndCall(path.Replace("program", "libB"), out var hostAlcWeakRef3);
-                        var alc = hostAlcWeakRef3.Target as AssemblyLoadContext;
-                        alc!.Unload();
-
-                        // Poll and run GC until the AssemblyLoadContext is unloaded.
-                        // You don't need to do that unless you want to know when the context
-                        // got unloaded. You can just leave it to the regular GC.
-                        for (int i = 0; hostAlcWeakRef3.IsAlive && (i < 100); i++)
-                        {
-                            GC.Collect();
-                            GC.WaitForPendingFinalizers();
-                            Thread.Sleep(2);
-                        }
-
-                        Console.WriteLine($"Unload success: {!hostAlcWeakRef3.IsAlive}");
-                    }
-                    break;
-                case 'v':
-                    // works
-                    {
-                        testCollection.Load(path.Replace("program", "libB"));
-                        Thread.Sleep(3000);
-                        testCollection.Call();
-                        testCollection.Unload();
-                    }
-                    break;
-                case '9':
-                    // works
-                    {
-                        testCollection.Load(path.Replace("program", "libB"));
-                        testCollection.LoadAnother(path.Replace("program", "libA"));
-                        Thread.Sleep(3000);
-                        testCollection.Call();
-                        testCollection.Unload();
-                    }
-                    break;
-                case '8':
-                    // no, even after later gcs
-                    {
-                        testCollection.Load(path.Replace("program", "libB"));
-                        Thread.Sleep(3000);
-                        WriteLine(engine.DoIt(testCollection.Get("libB")));
-                        testCollection.Unload();
-                    }
-                    break;
-                case '7':
-                    // yes, after a couple gcs, first destroys libB, second unloads assy
-                    {
-                        doit(path, engine, testCollection);
-                    }
-                    break;
-                case '6':
-                    // works after two gcs!
-                    {
-                        doitNew(path, engine, manager);
-                    }
-                    break;
                 case 'f':
                     {
                         var c = new C("in switch");
@@ -203,26 +85,15 @@ public class {0} : ITest
                 case 'q':
                     return;
                 case 'a':
-                    {
-                        var t = managerOrig!.GetImplementationsOf<ITest>(managerOrig!.LoadAssembly(path.Replace("program", "libA")));
-                        if (t != null)
-                            tests.AddRange(t);
-                    }
+                    engine.Load(path, "A");
                     break;
                 case 'b':
-                    {
-                        managerOrig!.LoadAssembly(path.Replace("program", "libB"));
-                        // if (t != null)
-                        //     tests.AddRange(t);
-                    }
+                    engine.Load(path, "B");
                     break;
-                case 'c':
-                    foreach (var t in tests)
-                    {
-                        WriteLine(t.Message(DateTime.Now.ToString()));
-                    }
+                case 'c': // call
+                    engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")));
                     break;
-                case 'd':
+                case 'd': // dump
                     WriteLine($"There are {AssemblyLoadContext.All.Count()} contexts");
                     foreach (var alc in AssemblyLoadContext.All)
                     {
@@ -237,75 +108,44 @@ public class {0} : ITest
                         }
                     }
                     break;
-                case 'u':
-                    managerOrig?.Unload();
+                case 'u': // unload
+                    engine.Unload();
                     tests.Clear();
-                    WriteLine($"Is unloaded is {managerOrig?.IsUnloaded()}");
                     break;
-                case 't':
-                    WriteLine($"Is unloaded is {managerOrig?.IsUnloaded()}");
+                case 't': // test
+                    //WriteLine($"Is unloaded is {manager?.IsUnloaded()}");
                     break;
                 case '1':
-                    for (int i = 0; i < 1; i++)
-                    {
-                        var name = $"Test{i}";
-                        var t = managerOrig!.BuildAndGet<ITest>(name, string.Format(code, name, 10, "d + 1"));
-                        if (t != null)
-                            tests.AddRange(t);
-                    }
+                    var name = $"ATest1";
+                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"));
                     break;
                 case '2':
-                    for (int i = 0; i < 100; i++)
-                    {
-                        var name = $"Test{i}";
-                        var t = managerOrig!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
-                        if (t != null)
-                            tests.AddRange(t);
-                    }
+                    name = $"ATest2";
+                    engine.Build(100, name, string.Format(code, name, 10, "1/(d + 1)"));
                     break;
                 case '3':
-                    for (int i = 0; i < 1000; i++)
-                    {
-                        var name = $"Test{i}";
-                        var t = managerOrig!.BuildAndGet<ITest>(name, string.Format(code, name, 100, "d + 10"));
-                        if (t != null)
-                            tests.AddRange(t);
-                    }
+                    name = $"ATest3";
+                    engine.Build(1000, name, string.Format(code, name, 10, "d *d"));
                     break;
-                case 'r':
-                    {
-                        WriteLine("Enter equation using 'd'");
-                        var s = ReadLine();
-                        if (!string.IsNullOrEmpty(s))
-                        {
-                            var name = $"ATest{loadCount++}";
-                            plotIt(name, string.Format(code, name, 1000, s), engine, manager);
-                        }
-                    }
-                    break;
-                case 's':
-                    {
-                        // this doesn't unload the assy even though exactly like the plotIt fn since we're in main
-                        WriteLine("Enter equation using 'd'");
-                        var s = ReadLine();
-                        if (!string.IsNullOrEmpty(s))
-                        {
-                            var name = $"ATest{loadCount++}";
-                            var t = manager!.BuildAndGet<ITest>(name, string.Format(code, name, 1000, s)).First();
-                            WriteLine(engine.DoIt(t));
-                            Thread.Sleep(3000);
-                            manager.Unload();
-                        }
-                    }
-                    break;
-                case 'p':
-                    foreach (var t in tests)
-                    {
-                        WriteLine($">>>> Chart for {t.Name}");
-                        var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
-                        WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
-                    }
-                    break;
+                //case 'r':
+                //    {
+                //        WriteLine("Enter equation using 'd'");
+                //        var s = ReadLine();
+                //        if (!string.IsNullOrEmpty(s))
+                //        {
+                //            name = $"ATest{loadCount++}";
+                //            plotIt(name, string.Format(code, name, 1000, s), engine, manager);
+                //        }
+                //    }
+                //    break;
+                //case 'p':
+                //    foreach (var t in tests)
+                //    {
+                //        WriteLine($">>>> Chart for {t.Name}");
+                //        var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
+                //        WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
+                //    }
+                //    break;
                 case 'g':
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
@@ -316,6 +156,14 @@ public class {0} : ITest
         }
     }
 
+    static void load(string path, string name, AssemblyManager<ITest> manager, List<ITest> tests )
+    {
+        manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"));
+        var t = manager.CreateInstance<ITest>(name);
+        if (t != null)
+            tests.Add(t);
+    }
+    
     //[MethodImpl(MethodImplOptions.NoInlining)]
     static void doit(string path, Engine engine, TestCollection testCollection)
     {
@@ -328,25 +176,25 @@ public class {0} : ITest
     }
     static void plotIt(string name, string code, Engine engine, AssemblyManager<ITest> manager)
     {
-        var t = manager!.BuildAndGet<ITest>(name, code).First();
-        WriteLine(engine.DoIt(t));
-        Thread.Sleep(3000);
-        manager.Unload();
+        // var t = manager!.BuildAndGet<ITest>(name, code).First();
+        // WriteLine(engine.DoIt(t));
+        // Thread.Sleep(3000);
+        // manager.Unload();
     }
 
     static void doitNew(string path, Engine engine, AssemblyManager<ITest> manager)
     {
-        manager.Load(path.Replace("program", "libB"));
-        WriteLine(engine.DoIt(manager.Get<ITest>(path.Replace("program", "libB"))));
-        Thread.Sleep(3000);
-        manager.Unload();
+        // manager.Load(path.Replace("program", "libB"));
+        // WriteLine(engine.DoIt(manager.CreateInstance<ITest>(path.Replace("program", "libB"))));
+        // Thread.Sleep(3000);
+        // manager.Unload();
     }
     static void doitNewOk(string path, Engine engine, AssemblyManager<ITest> manager)
     {
-        var test = manager.LoadAndGet<ITest>(path.Replace("program", "libB"));
-        WriteLine(engine.DoIt(test));
-        Thread.Sleep(3000);
-        manager.Unload();
+        // var test = manager.LoadAndGet<ITest>(path.Replace("program", "libB"));
+        // WriteLine(engine.DoIt(test));
+        // Thread.Sleep(3000);
+        // manager.Unload();
     }
     static void newC()
     {
