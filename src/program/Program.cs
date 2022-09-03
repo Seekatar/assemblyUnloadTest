@@ -4,14 +4,6 @@ using static System.Console;
 using Microsoft.CodeAnalysis;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using AssemblyContextTest;
-using program;
-using System.Runtime.CompilerServices;
-using Elasticsearch.Net;
-using System.Xml.Linq;
-using Seekatar.Tools;
-using static System.Net.Mime.MediaTypeNames;
-using System.IO;
 
 class C
 {
@@ -123,7 +115,7 @@ public class {0} : ITest
                         if (!string.IsNullOrEmpty(s))
                         {
                             name = $"ATest{loadCount++}";
-                            plotIt(name, string.Format(code, name, 1000, s), engine);
+                            engine.Build(1, name, string.Format(code, name, 1000, s));
                         }
                     }
                     break;
@@ -145,6 +137,7 @@ public class {0} : ITest
         }
     }
 
+    // can't be in main, since that will prevent the context from unloading
     static void dump()
     {
         WriteLine($"There are {AssemblyLoadContext.All.Count()} contexts");
@@ -162,43 +155,7 @@ public class {0} : ITest
         }
     }
     
-    static void load(string path, string name, AssemblyManager<ITest> manager, List<ITest> tests )
-    {
-        manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"));
-        var t = manager.CreateInstance<ITest>(name);
-        if (t != null)
-            tests.Add(t);
-    }
-    
-    //[MethodImpl(MethodImplOptions.NoInlining)]
-    static void doit(string path, Engine engine, TestCollection testCollection)
-    {
-        testCollection.Load(path.Replace("program", "libB"));
-        Thread.Sleep(3000);
-        var lib = testCollection.Get("libB");
-        WriteLine(engine.DoIt(lib));
-        testCollection.Unload();
-
-    }
-    static void plotIt(string name, string code, Engine engine)
-    {
-        engine.Build(1, name, code);
-    }
-
-    static void doitNew(string path, Engine engine, AssemblyManager<ITest> manager)
-    {
-        // manager.Load(path.Replace("program", "libB"));
-        // WriteLine(engine.DoIt(manager.CreateInstance<ITest>(path.Replace("program", "libB"))));
-        // Thread.Sleep(3000);
-        // manager.Unload();
-    }
-    static void doitNewOk(string path, Engine engine, AssemblyManager<ITest> manager)
-    {
-        // var test = manager.LoadAndGet<ITest>(path.Replace("program", "libB"));
-        // WriteLine(engine.DoIt(test));
-        // Thread.Sleep(3000);
-        // manager.Unload();
-    }
+    // this will go away, but allocating one in Main() will not, even if local
     static void newC()
     {
         var c = new C("in fn");

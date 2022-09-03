@@ -67,6 +67,8 @@ public class AssemblyManager<T>
 
     public Assembly? LoadFromStream(string name, Stream s, Stream? pdbStream = null, string contextName = FirstContextName)
     {
+        if (s is null) return null;
+
         var context = CheckContext(contextName);
         _logger.LogInformation("Loading {assemblyName} into context {contextName}.", name, contextName);
         _logger.LogInformation("Context currently has {assemblyCount} assemblies", context.Assemblies.Count());
