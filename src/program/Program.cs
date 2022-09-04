@@ -5,15 +5,19 @@ using Microsoft.CodeAnalysis;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-class C
+
+/// <summary>
+/// Class to log when created and when destroyed
+/// </summary>
+class DestructorTest
 {
     string _s;
-    public C(string s)
+    public DestructorTest(string s)
     {
         _s = s;
         WriteLine($">>>> CCCCCCCCCCCCCCC {s}");
     }
-    ~C() { WriteLine($"~~~~ CCCCCCCCCCCCCCCCCCCCC {_s}");  }
+    ~DestructorTest() { WriteLine($"~~~~ CCCCCCCCCCCCCCCCCCCCC {_s}");  }
 }
 
 public static class Program
@@ -27,13 +31,12 @@ public static class Program
 
         Console.OutputEncoding = Encoding.UTF8; // for ascii chart
 
-        List<ITest> tests = new();
         var cmd = ' ';
 
         var myContext = AssemblyLoadContext.GetLoadContext(Assembly.GetExecutingAssembly());
-        logger.LogInformation($"Default Context is {myContext?.Name}");
+        logger.LogInformation($"Default Context is '{myContext?.Name}'");
 
-        int loadCount = 1;
+        int counter = 1;
 
         var code = @"
 using System;
@@ -64,41 +67,36 @@ public class {0} : ITest
             WriteLine("\nPress a key: load(a), load(b), (u)nload, (c)all, (g)arbage (q)uit");
 
             cmd = ReadKey().KeyChar;
+            var testContext = Char.IsUpper(cmd);
+            cmd = Char.ToLower(cmd);
+
             WriteLine($" pressed");
             switch (cmd)
             {
-                case 'f':
+                case 'f': // test to see that var c never gets collected, but c in newC() does
                     {
-                        var c = new C("in switch");
+                        var c = new DestructorTest("in switch");
                         c = null;
                         newC();
                     }
                     break;
-                case 'q':
+                case 'q': // quit
                     return;
-                case 'a':
+                case 'a': // load libA
                     engine.Load(path, "A");
                     break;
-                case 'b':
-                    engine.Load(path, "B");
-                    break;
-                case 'B':
-                    engine.Load(path, "B", "ALT");
+                case 'b': // load libB
+                    engine.Load(path, "B", testContext);
                     break;
                 case 'c': // call
-                    engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")));
+                    engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")), testContext);
                     break;
-                case 'd': // dump
-                    // inline holds the assyn
+                case 'd': // dump contexts
+                    // inline holds the assys 
                     dump();
                     break;
                 case 'u': // unload
-                    engine.Unload();
-                    tests.Clear();
-                    break;
-                case 'U': // unload
-                    engine.Unload("ALT");
-                    tests.Clear();
+                    engine.Unload(testContext);
                     break;
                 case 't': // test
                     WriteLine($"Is unloaded is {engine.IsUnloaded()}");
@@ -109,7 +107,7 @@ public class {0} : ITest
                     break;
                 case '!':
                     name = $"ATest1";
-                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"), "ALT");
+                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"), true);
                     break;
                 case '2':
                     name = $"ATest2";
@@ -119,24 +117,24 @@ public class {0} : ITest
                     name = $"ATest3";
                     engine.Build(1000, name, string.Format(code, name, 10, "d *d"));
                     break;
-                case 'r':
+                case 'e': // build from equations
                     {
                         WriteLine("Enter equation using 'd'");
                         var s = ReadLine();
                         if (!string.IsNullOrEmpty(s))
                         {
-                            name = $"ATest{loadCount++}";
-                            engine.Build(1, name, string.Format(code, name, 1000, s));
+                            name = $"ATest{counter++}";
+                            engine.Build(1, name, string.Format(code, name, 1000, s), testContext);
                         }
                     }
                     break;
-                case 'p':
+                case 'p': // plot
                     engine.DoOnAll(t =>
                     {
                         WriteLine($">>>> Chart for {t.Name}");
                         var values = Enumerable.Range(0, 50).Select(o => t.Value(o));
                         WriteLine(AsciiChart.Sharp.AsciiChart.Plot(values, new AsciiChart.Sharp.Options { Height = 10 }));
-                    });
+                    }, testContext);
                     break;
                 case 'g':
                     GC.Collect();
@@ -169,7 +167,7 @@ public class {0} : ITest
     // this will go away, but allocating one in Main() will not, even if local
     static void newC()
     {
-        var c = new C("in fn");
+        var c = new DestructorTest("in fn");
         c = null;
     }
 }

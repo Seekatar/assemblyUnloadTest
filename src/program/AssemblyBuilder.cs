@@ -5,7 +5,7 @@ using SerilogTimings;
 
 namespace Seekatar.Tools;
 
-public class AssemblyBuilder<T>
+public class AssemblyBuilder
 {
     private readonly ILogger _logger;
     private List<PortableExecutableReference> _trustedReferences = new();

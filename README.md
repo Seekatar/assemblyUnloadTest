@@ -1,24 +1,28 @@
 # .NET Core Assembly Unloading
 
+See my [blog]() about this for more details about unloading assemblies in .NET.
+
 This is a little PoC for unloading assemblies in .NET Core. I had done this in the past with .NET Framework, but the APIs are different for .NET Core.
 
-This console app does a few things by pressing a single key.
+This console app loads, calls, and unloads assemblies in an `AssemblyLoadContext`. The following commands are available in `Program.cs`.
 
-Key|Action
--|-
-a|Load `libA` library built separately
-b|Load `libB` library built separately
-c|Call `Message()` on all loaded assemblies
-d|Dump info about the assemblies
-g|Call garbage collector
-p|Call `Value()` with 1-50 and plot results for all loaded assemblies
-r|Enter an equation for dynamically built and loaded assembly
-1|Build and load 1 assembly
-2|Build and load 1000 assemblies
-u|Unload all assemblies
-q|Quit
+| Key | Action                                                              |
+| --- | ------------------------------------------------------------------- |
+| a   | Load `libA` library, built separately, into a context               |
+| b   | Load `libB` library, built separately, into a context               |
+| c   | Call `Message()` on all loaded assemblies                           |
+| d   | Dump info about the assemblies contexts                             |
+| g   | Call garbage collector                                              |
+| p   | Call `Value()` with 1-50 and plot results for all loaded assemblies |
+| e   | Enter an equation to dynamically build and loaded assembly          |
+| 1   | Build and load 1 assembly                                           |
+| 2   | Build and load 1000 assemblies                                      |
+| u   | Unload all assemblies                                               |
+| q   | Quit                                                                |
 
-For `r` you are prompted for a simple math expression. `System.Math` methods are available without a prefix (e.g. `Sin(d)`). The expression is then used to pass to  Rosyln to build and load the assembly on-the-fly. As a fun little exercise, pressing `p` plots them using  [Ascii Chart C#](https://github.com/NathanBaulch/asciichart-sharp).
+For most of the commands, if you enter the capital letter it will use a "Test" load context. So there can be up to three contexts: Default and two created by the test app.
+
+For `e` you are prompted for a simple math expression. `System.Math` methods are available without a prefix (e.g. `Sin(d)`). The expression is then used to pass to Rosyln to build and load the assembly on-the-fly. As a fun little exercise, pressing `p` plots them using  [Ascii Chart C#](https://github.com/NathanBaulch/asciichart-sharp).
 
 ```text
 >>>> Chart for Sin(d/4)

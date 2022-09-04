@@ -2,37 +2,40 @@
 using Seekatar.Tools;
 using static System.Console;
 
+/// <summary>
+/// Sample class to show how to load and unload assemblies
+/// </summary>
+/// <remarks> 
+/// This sample loads assemblies to "run", and also loads some in 
+/// a "test" context that it will unload at times.
+/// </remarks>
 public class Engine
 {
     private readonly ILogger _logger;
-    AssemblyBuilder<ITest> _builder;
-    private readonly AssemblyManager<ITest> _manager;
+    private readonly AssemblyBuilder _builder;
+    private readonly AssemblyManager _manager;
 
-    private List<ITest> _tests = new();
+    private List<ITest> _active = new();
+    private List<ITest> _testing = new();
+    private const string TestContextName = "Test";
 
     public Engine(ILogger logger)
     {
         _logger = logger;
-        _builder = new AssemblyBuilder<ITest>(logger);
-        _manager = new AssemblyManager<ITest>(logger);
+        _builder = new AssemblyBuilder(logger);
+        _manager = new AssemblyManager(logger);
     }
 
-    public string? DoIt(ITest? test)
+    /// <summary>
+    /// Build count assemblies and load them
+    /// </summary>
+    /// <param name="count"></param>
+    /// <param name="name"></param>
+    /// <param name="code"></param>
+    /// <param name="test">Create in test context</param>
+    internal void Build(int count, string name, string code, bool test = false)
     {
-        DoMore(test);
-        return test?.Message("From Engine");
-    }
-
-    private void DoMore(ITest? test)
-    {
-        if (DoMore != null)
-        {
-            WriteLine($"DoMore: {test?.Message("From DoMore")}");
-        }
-    }
-
-    internal void Build(int count, string name, string code, string? contextName = null)
-    {
+        var contextName = test ? TestContextName : null;
         for (int i = 0; i < count; i++)
         {
             var fullName = $"{name}-{i}";
@@ -43,7 +46,10 @@ public class Engine
                 var t = _manager.CreateInstance<ITest>(fullName, contextName);
                 if (t != null)
                 {
-                    _tests.Add(t);
+                    if (test)
+                        _testing.Add(t);
+                    else
+                        _active.Add(t);
                 }
                 else
                 {
@@ -53,27 +59,73 @@ public class Engine
         }
     }
 
-    internal void Load(string path, string name, string? contextName = null)
+    /// <summary>
+    /// Load an assembly and create an instance of ITest from it
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="name"></param>
+    /// <param name="test"></param>
+    internal void Load(string path, string name, bool test = false)
     {
+        var contextName = test ? TestContextName : null;
+
         _manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"), contextName);
-        var t = _manager.CreateInstance<ITest>(name);
+        var t = _manager.CreateInstance<ITest>(name, contextName);
         if (t != null)
-            _tests.Add(t);
+        {
+            if (test)
+                _testing.Add(t);
+            else
+                _active.Add(t);
+        }
+        else
+        {
+            _logger.LogWarning("Didn't create instance named {assemblyName}", name);
+        }
     }
 
-    internal void Unload(string? contextName = null)
+    /// <summary>
+    /// Unload all assemblies
+    /// </summary>
+    internal void Unload(bool test = false)
     {
-        _tests = new List<ITest>();
-        _manager.Unload(contextName);
+        if (test)
+        {
+            _testing = new List<ITest>();
+            _manager.Unload(TestContextName);
+        }
+        else
+        {
+            _active = new List<ITest>();
+            _manager.Unload();
+        }
     }
 
-    internal void DoOnAll(Action<ITest> action)
+    /// <summary>
+    /// Run this action all all the objects loaded.
+    /// </summary>
+    /// <param name="action"></param>
+    internal void DoOnAll(Action<ITest> action, bool test = false)
     {
-        foreach (var t in _tests)
+        foreach (var t in test ? _testing : _active)
         {
             action(t);
         }
     }
+
+    /// <summary>
+    /// Run this action all all the objects loaded.
+    /// </summary>
+    /// <param name="action"></param>
+    internal void DoOn(string name, Action<ITest> action, bool test)
+    {
+        var t = (test ? _testing : _active).SingleOrDefault(o => o.Name == name);
+        if (t != null)
+        {
+            action(t);
+        }
+    }
+
 
     internal bool IsUnloaded() => _manager.IsUnloaded();
 }
