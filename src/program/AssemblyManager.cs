@@ -37,7 +37,7 @@ public class AssemblyManager
     }
 
     private readonly ILogger _logger;
-    private const string FirstContextName = "__FirstContext__";
+    public const string FirstContextName = "__FirstContext__";
     private Dictionary<string, CollectableAssemblyLoadContext> _contexts = new() { { FirstContextName, new CollectableAssemblyLoadContext(FirstContextName) } };
     private WeakReference _deadContext = new(null);
 
@@ -64,22 +64,22 @@ public class AssemblyManager
     /// <summary>
     /// Load an assembly give the path to a dll
     /// </summary>
-    /// <param name="name">Name you give that should unique to context</param>
+    /// <param name="label">Label used in other calls. Should be unique to context</param>
     /// <param name="fileName">Filename of dll</param>
     /// <param name="contextName">Name of the context to load into</param>
     /// <returns>true if loaded</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public bool LoadFromAssemblyPath(string name, string fileName, string? contextName = null)
+    public bool LoadFromAssemblyPath(string label, string fileName, string? contextName = null)
     {
         contextName ??= FirstContextName;
 
         var context = CheckContext(contextName);
 
-        _logger.LogInformation("Loading {assemblyName} into context that {contextName} currently has {assemblyCount} assemblies.", name, contextName, context.Assemblies.Count());
+        _logger.LogInformation("Loading {assemblyName} into context {contextName} that currently has {assemblyCount} assemblies.", label, contextName, context.Assemblies.Count());
 
         var ret = context.LoadFromAssemblyPath(fileName);
         if (ret != null)
-            context.LoadedAssemblies.Add(name, ret);
+            context.LoadedAssemblies.Add(label, ret);
         return ret != null;
     }
 
@@ -87,44 +87,42 @@ public class AssemblyManager
     /// <summary>
     /// Load an assembly give the stream
     /// </summary>
-    /// <param name="name">Name you give that should unique to context</param>
+    /// <param name="label">Label used in other calls. Should be unique to context</param>
     /// <param name="assembly">Stream of assembly</param>
     /// <param name="assemblySymbols">Stream of assembly symbols</param>
     /// <param name="contextName">Name of the context to load into</param>
     /// <returns>true if loaded</returns>
-    public bool LoadFromStream(string name, Stream assembly, Stream? assemblySymbols = null, string? contextName = null)
+    public bool LoadFromStream(string label, Stream assembly, Stream? assemblySymbols = null, string? contextName = null)
     {
         contextName ??= FirstContextName;
         if (assembly is null) return false;
 
         var context = CheckContext(contextName);
-        _logger.LogInformation("Loading {assemblyName} into context {contextName}.", name, contextName);
-        _logger.LogInformation("Context currently has {assemblyCount} assemblies", context.Assemblies.Count());
+        _logger.LogInformation("Loading {assemblyName} into context {contextName} that currently has {assemblyCount} assemblies.", label, contextName, context.Assemblies.Count());
 
         var ret = context.LoadFromStream(assembly, assemblySymbols);
         if (ret != null)
-            context.LoadedAssemblies.Add(name, ret);
+            context.LoadedAssemblies.Add(label, ret);
         return ret != null;
     }
 
     /// <summary>
     /// Create an instance of an object from a loaded assembly in the manager's first (default) context
     /// </summary>
-    /// <typeparam name="TObj">Type of object to create</typeparam>
-    /// <param name="name">Name give to assembly on Load</param>
+    /// <param name="label">Label given to assembly on Load()</param>
     /// <param name="args">Constructor arguments</param>
     /// <returns>The new object, or null</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public TObj? CreateInstance<TObj>(string name, params object?[]? args) where TObj : class
+    public TObj? CreateInstance<TObj>(string label, params object?[]? args) where TObj : class
     {
-        return CreateInstance<TObj>(name, FirstContextName, args);
+        return CreateInstance<TObj>(label, FirstContextName, args);
     }
 
     /// <summary>
     /// Create an instance of an object from a loaded assembly from a specific contet
     /// </summary>
     /// <typeparam name="TObj">Type of object to create</typeparam>
-    /// <param name="name">Name give to assembly on Load</param>
+    /// <param name="label">Label given to assembly on Load()</param>
     /// <param name="contextName">Name give to assembly on Load</param>
     /// <param name="args">Constructor arguments</param>
     /// <returns>The new object, or null</returns>
@@ -132,21 +130,21 @@ public class AssemblyManager
     /// WARNING, you must release all references to the returned object before doing Unload(), otherwise the assembly will not unload
     /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public TObj? CreateInstance<TObj>(string name, string? contextName, params object?[]? args) where TObj : class
+    public TObj? CreateInstance<TObj>(string label, string? contextName, params object?[]? args) where TObj : class
     {
         contextName ??= FirstContextName;
         if (_contexts.TryGetValue(contextName, out var context))
         {
-            var assembly = context.LoadedAssemblies.Where(o => o.Key == name).Select(o => o.Value).FirstOrDefault();
+            var assembly = context.LoadedAssemblies.Where(o => o.Key == label).Select(o => o.Value).FirstOrDefault();
             if (assembly == null)
             {
-                _logger.LogWarning("Didn't find assembly for {assemblyName}", name);
+                _logger.LogWarning("Didn't find assembly for {assemblyName}", label);
                 return null;
             }
             var type = assembly.GetTypes().Where(o => o.IsAssignableTo(typeof(TObj)))?.FirstOrDefault();
             if (type == null)
             {
-                _logger.LogWarning("Didn't type of {typeName} in {assemblyName}", typeof(TObj).Name, name);
+                _logger.LogWarning("Didn't type of {typeName} in {assemblyName}", typeof(TObj).Name, label);
                 return null;
             }
 

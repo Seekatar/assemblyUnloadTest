@@ -1,12 +1,14 @@
 ﻿using Microsoft.Extensions.Logging;
 using Seekatar.Tools;
-using static System.Console;
+
+
+namespace AssemblyUnload;
 
 /// <summary>
 /// Sample class to show how to load and unload assemblies
 /// </summary>
-/// <remarks> 
-/// This sample loads assemblies to "run", and also loads some in 
+/// <remarks>
+/// This sample loads assemblies to "run", and also loads some in
 /// a "test" context that it will unload at times.
 /// </remarks>
 public class Engine
@@ -33,7 +35,7 @@ public class Engine
     /// <param name="name"></param>
     /// <param name="code"></param>
     /// <param name="test">Create in test context</param>
-    internal void Build(int count, string name, string code, bool test = false)
+    public void Build(int count, string name, string code, bool test = false)
     {
         var contextName = test ? TestContextName : null;
         for (int i = 0; i < count; i++)
@@ -65,11 +67,11 @@ public class Engine
     /// <param name="path"></param>
     /// <param name="name"></param>
     /// <param name="test"></param>
-    internal void Load(string path, string name, bool test = false)
+    public void Load(string path, string name, bool test = false)
     {
         var contextName = test ? TestContextName : null;
 
-        _manager.LoadFromAssemblyPath(name, path.Replace("program", $"lib{name}"), contextName);
+        _manager.LoadFromAssemblyPath(name, path, contextName);
         var t = _manager.CreateInstance<ITest>(name, contextName);
         if (t != null)
         {
@@ -87,7 +89,7 @@ public class Engine
     /// <summary>
     /// Unload all assemblies
     /// </summary>
-    internal void Unload(bool test = false)
+    public void Unload(bool test = false)
     {
         if (test)
         {
@@ -105,7 +107,7 @@ public class Engine
     /// Run this action all all the objects loaded.
     /// </summary>
     /// <param name="action"></param>
-    internal void DoOnAll(Action<ITest> action, bool test = false)
+    public void DoOnAll(Action<ITest> action, bool test = false)
     {
         foreach (var t in test ? _testing : _active)
         {
@@ -117,7 +119,7 @@ public class Engine
     /// Run this action all all the objects loaded.
     /// </summary>
     /// <param name="action"></param>
-    internal void DoOn(string name, Action<ITest> action, bool test)
+    public void DoOn(string name, Action<ITest> action, bool test = false)
     {
         var t = (test ? _testing : _active).SingleOrDefault(o => o.Name == name);
         if (t != null)
@@ -127,5 +129,5 @@ public class Engine
     }
 
 
-    internal bool IsUnloaded() => _manager.IsUnloaded();
+    public bool IsUnloaded() => _manager.IsUnloaded();
 }

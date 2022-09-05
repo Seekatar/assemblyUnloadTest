@@ -6,6 +6,8 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 
 
+namespace AssemblyUnload;
+
 /// <summary>
 /// Class to log when created and when destroyed
 /// </summary>
@@ -64,7 +66,7 @@ public class {0} : ITest
         var path = Assembly.GetExecutingAssembly().Location;
         while (true)
         {
-            WriteLine("\nPress a key: load(a), load(b), (u)nload, (c)all, (g)arbage (q)uit");
+            WriteLine("\nPress a key: (enter for help)");
 
             cmd = ReadKey().KeyChar;
             var testContext = Char.IsUpper(cmd);
@@ -83,39 +85,35 @@ public class {0} : ITest
                 case 'q': // quit
                     return;
                 case 'a': // load libA
-                    engine.Load(path, "A");
+                    engine.Load(path.Replace("program", "libA"), "A", testContext);
                     break;
                 case 'b': // load libB
-                    engine.Load(path, "B", testContext);
+                    engine.Load(path.Replace("program", "libA"), "B", testContext);
                     break;
                 case 'c': // call
                     engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")), testContext);
                     break;
                 case 'd': // dump contexts
-                    // inline holds the assys 
+                    // inline holds the assys
                     dump();
                     break;
                 case 'u': // unload
                     engine.Unload(testContext);
                     break;
                 case 't': // test
-                    WriteLine($"Is unloaded is {engine.IsUnloaded()}");
+                    WriteLine($"Last unloaded is {engine.IsUnloaded()}");
                     break;
-                case '1':
+                case 'x':
                     var name = $"ATest1";
-                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"));
+                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"), testContext);
                     break;
-                case '!':
-                    name = $"ATest1";
-                    engine.Build(1, name, string.Format(code, name, 10, "d + 1"), true);
+                case 'y':
+                    name = $"ATest100";
+                    engine.Build(100, name, string.Format(code, name, 10, "1/(d + 1)"), testContext);
                     break;
-                case '2':
-                    name = $"ATest2";
-                    engine.Build(100, name, string.Format(code, name, 10, "1/(d + 1)"));
-                    break;
-                case '3':
-                    name = $"ATest3";
-                    engine.Build(1000, name, string.Format(code, name, 10, "d *d"));
+                case 'z':
+                    name = $"ATest1000";
+                    engine.Build(1000, name, string.Format(code, name, 10, "d *d"), testContext);
                     break;
                 case 'e': // build from equations
                     {
@@ -141,6 +139,15 @@ public class {0} : ITest
                     GC.WaitForPendingFinalizers();
                     break;
                 default:
+                    WriteLine("Commands: ");
+                    WriteLine("  load static assembly (a), (b)");
+                    WriteLine("  load 1, 100, 1000 dynamic assemblies: (x),(y),(z)");
+                    WriteLine("  (e)nter expression for new assembly");
+                    WriteLine("  (c)all Message, call (p)lot on all");
+                    WriteLine("  (d)ump contexts, (t)est unload");
+                    WriteLine("  (q)uit");
+                    WriteLine("  ");
+                    WriteLine("  Use capital letters to load into 'Test' context instead");
                     break;
             }
         }
@@ -163,7 +170,7 @@ public class {0} : ITest
             }
         }
     }
-    
+
     // this will go away, but allocating one in Main() will not, even if local
     static void newC()
     {
