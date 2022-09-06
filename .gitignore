@@ -511,3 +511,4 @@ FodyWeavers.xsd
 # End of https://www.toptal.com/developers/gitignore/api/dotnetcore,visualstudio,visualstudiocode,rider
 
 src/libA/helm.exe
+.idea
