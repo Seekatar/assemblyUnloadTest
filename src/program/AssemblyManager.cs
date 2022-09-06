@@ -77,10 +77,24 @@ public class AssemblyManager
 
         _logger.LogInformation("Loading {assemblyName} into context {contextName} that currently has {assemblyCount} assemblies.", label, contextName, context.Assemblies.Count());
 
-        var ret = context.LoadFromAssemblyPath(fileName);
-        if (ret != null)
-            context.LoadedAssemblies.Add(label, ret);
-        return ret != null;
+        if (!File.Exists(fileName))  
+        {    _logger.LogWarning("Assembly file {assembly} does not exist", fileName);
+            return false;
+            
+        }
+
+        try
+        {
+            var ret = context.LoadFromAssemblyPath(fileName);
+            if (ret != null)
+                context.LoadedAssemblies.Add(label, ret);
+            return ret != null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading {assemblyName} into context {contextName}", label, contextName);
+            return false;
+        }
     }
 
 

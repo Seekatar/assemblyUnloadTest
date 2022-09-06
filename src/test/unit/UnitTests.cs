@@ -22,7 +22,8 @@ public class UnitTests
         var parts = _path.Split(Path.DirectorySeparatorChar);
 
         // where libA & libB build to
-        _path = Path.Combine(Path.Combine(parts[0..(parts.Length-6)]), Path.Combine("assemblies",Path.Combine(parts[^3..^1])));
+        var prefix = Path.DirectorySeparatorChar == '/' ? "/" : "";
+        _path = prefix+Path.Combine(Path.Combine(parts[0..(parts.Length-6)]), Path.Combine("assemblies",Path.Combine(parts[^3..^1])));
     }
 
 

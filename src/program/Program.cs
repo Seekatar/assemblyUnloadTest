@@ -85,10 +85,10 @@ public class {0} : ITest
                 case 'q': // quit
                     return;
                 case 'a': // load libA
-                    engine.Load(path.Replace("program", "libA"), "A", testContext);
+                    engine.Load(path.Replace("program", "libA").Replace("bin","obj"), "A", testContext);
                     break;
                 case 'b': // load libB
-                    engine.Load(path.Replace("program", "libA"), "B", testContext);
+                    engine.Load(path.Replace("program", "libB").Replace("bin","obj"), "B", testContext);
                     break;
                 case 'c': // call
                     engine.DoOnAll(t => WriteLine(t.Message($"From Program {DateTime.Now.ToString()}")), testContext);

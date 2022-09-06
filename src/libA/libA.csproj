@@ -1,10 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <EmbeddedResource Include="helm.exe" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\program\program.csproj" />
   </ItemGroup>
 
