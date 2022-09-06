@@ -79,7 +79,7 @@ public class {0} : ITest
                     {
                         var c = new DestructorTest("in switch");
                         c = null;
-                        newC();
+                        testDestructor();
                     }
                     break;
                 case 'q': // quit
@@ -172,7 +172,7 @@ public class {0} : ITest
     }
 
     // this will go away, but allocating one in Main() will not, even if local
-    static void newC()
+    static void testDestructor()
     {
         var c = new DestructorTest("in fn");
         c = null;

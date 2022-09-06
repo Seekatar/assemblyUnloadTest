@@ -1,8 +1,8 @@
 # .NET Core Assembly Unloading
 
-See my [blog]() about this for more details about unloading assemblies in .NET.
+This is the source code for this [blog](https://seekatar.github.io/2022/09/04/unloading-assemblies.html) entry about unloading assemblies in .NET.
 
-This is a little PoC for unloading assemblies in .NET Core. I had done this in the past with .NET Framework, but the APIs are different for .NET Core.
+## Program.cs
 
 This console app loads, calls, and unloads assemblies in an `AssemblyLoadContext`. The following commands are available in `Program.cs`.
 
@@ -11,12 +11,13 @@ This console app loads, calls, and unloads assemblies in an `AssemblyLoadContext
 | a   | Load `libA` library, built separately, into a context               |
 | b   | Load `libB` library, built separately, into a context               |
 | c   | Call `Message()` on all loaded assemblies                           |
-| d   | Dump info about the assemblies contexts                             |
+| d   | Dump info about the contexts                                        |
 | g   | Call garbage collector                                              |
 | p   | Call `Value()` with 1-50 and plot results for all loaded assemblies |
 | e   | Enter an equation to dynamically build and loaded assembly          |
-| 1   | Build and load 1 assembly                                           |
-| 2   | Build and load 1000 assemblies                                      |
+| x   | Build and load 1 assembly                                           |
+| y   | Build and load 100 assemblies                                       |
+| z   | Build and load 1000 assemblies                                      |
 | u   | Unload all assemblies                                               |
 | q   | Quit                                                                |
 
@@ -63,34 +64,10 @@ For `e` you are prompted for a simple math expression. `System.Math` methods are
     0.00 ┼──────────╯
 ```
 
-## Notes
-
-From [here](https://docs.microsoft.com/en-us/dotnet/standard/assembly/unloadability)
-
-The AssemblyLoadContext-derived class returns null to indicate that it should be loaded into the default context from locations that the runtime uses to load assemblies by default.
-
-After the calling a method in the loaded assembly, you can initiate unloading by either calling the Unload method on the custom AssemblyLoadContext or getting rid of the reference you have to the AssemblyLoadContext
-
-## Design
-
-Any use in Main holds the assembly
-Dump inline holds the assembly
-Not wiping the dict on the CollectableAssemblyLoadContext holds the assembly
-
-Load assemblies
-  AssemblyManager<T>()
-  Load(into named bucket)
-  Unload(bucketName)
-  Type Array internally
-  Create with Activator on demand <T>Create(name, args)
-
-  Register with DI and then they can inject, or call us on demand << won't that create hard dep in the ServiceLocator? So can't unload
-
 ## Links
 
 - [MS Doc: AssemblyLoadContext Class](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.loader.assemblyloadcontext)
 - [MS Doc: How to use and debug assembly unloadability in .NET Core](https://docs.microsoft.com/en-us/dotnet/standard/assembly/unloadability)
 - [MS Doc: Understanding System.Runtime.Loader.AssemblyLoadContext](https://docs.microsoft.com/en-us/dotnet/core/dependency-loading/understanding-assemblyloadcontext)
-- [MS Doc: How to use and debug assembly unloadability in .NET Core](https://docs.microsoft.com/en-us/dotnet/standard/assembly/unloadability)
 - [Exploring the new Assembly unloading feature in .NET Core 3.0 by building a simple plugin system running on ASP.NET Core Blazor](https://stevenknox.net/exploring-assembly-unloading-in-net-core-3-0-by-building-a-simple-plugin-architecture/) by Steve Knox
 - [Ascii Chart C#](https://github.com/NathanBaulch/asciichart-sharp)
