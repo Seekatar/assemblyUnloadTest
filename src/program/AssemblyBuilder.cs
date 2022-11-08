@@ -2,8 +2,28 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using SerilogTimings;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Seekatar.Tools;
+
+public class ProblemDetailsException : Exception
+{
+    public ProblemDetailsException()
+    {
+        Details = new ProblemDetails();
+    }
+
+    public ProblemDetails Details { get; }
+}
+public class CompilerError {
+    public CompilerError(Diagnostic d, string t)
+    {
+        Text = t;
+        Diagnostic = d;
+    }
+    public Diagnostic Diagnostic { get; }
+    public string Text { get; }
+}
 
 public class AssemblyBuilder
 {
@@ -22,7 +42,12 @@ public class AssemblyBuilder
     {
         if (!diag.Any(o => o.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)) return true;
 
-        _logger.LogInformation($"Compiler errors");
+        var ex = new ProblemDetailsException();
+        ex.Details.Title = "Compiler errors";
+        ex.Details.Status = 400;
+        ex.Details.Detail = "The code you submitted contains errors.";
+        var i = 1;
+        _logger.LogInformation("Compiler errors");
         foreach (var e in diag.Where(o => o.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning))
         {
             _logger.LogInformation($"   {e.ToString()}");
@@ -36,9 +61,11 @@ public class AssemblyBuilder
                 end = end < 0 ? code.Length : end;
 
                 _logger.LogInformation(code[begin..end]);
+                ex.Details.Extensions.Add($"Error{i++}", new CompilerError( e, code[begin..end] ));
             }
         }
-        return false;
+        throw ex;
+        // return false;
     }
 
     public (Stream? pe, Stream? pdb) BuildAssembly(string name, string code)
