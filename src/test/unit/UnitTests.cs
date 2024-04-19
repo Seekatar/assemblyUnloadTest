@@ -7,6 +7,7 @@ using System.Reflection;
 using System.IO;
 using Seekatar.Tools;
 using System.Runtime.Loader;
+using System.Diagnostics;
 
 namespace unit;
 
@@ -25,7 +26,45 @@ public class UnitTests
         var prefix = Path.DirectorySeparatorChar == '/' ? "/" : "";
         _path = prefix+Path.Combine(Path.Combine(parts[0..(parts.Length-6)]), Path.Combine("assemblies",Path.Combine(parts[^3..^1])));
     }
+        string code = @"
+using System;
+namespace {0};
+using static System.Console;
+using static Math;
 
+public class {0} : ITest
+{{
+    public string Name => ""{2}"";
+    public int AddTo(int i) => i + {1};
+
+    public string Message(string message) => $""@@@@ {0} '{{message}}"";
+
+    public double Value(double d) => {2};
+
+    ~{0} () {{
+        WriteLine(""~~~~ {0} destroyed!"");
+    }}
+}}
+";
+    [Theory]
+    [InlineData("barf!", "barf!", "barf!", 27)]
+    [InlineData("barf", "\"test\"", "1.2", 1)]
+    public void CompilerErrorTest(string content0, string content1, string content2, int expectedCount)
+    {
+        var builder = new AssemblyBuilder(_logger);
+        try {
+            builder.BuildAssembly("test", string.Format(code,content0,content1,content2));
+            false.ShouldBeTrue();
+        } catch (ProblemDetailsException e) {
+            e.Details.Extensions.Count.ShouldBe(expectedCount);
+            foreach ( var ex in e.Details.Extensions.Values.OfType<CompilerError>())
+            {
+                Debug.WriteLine("---");
+                Debug.WriteLine(ex.Text);
+                Debug.WriteLine(ex.Diagnostic.ToString());
+            }
+        }
+    }
 
     [Fact]
     public void LoadLibB()
